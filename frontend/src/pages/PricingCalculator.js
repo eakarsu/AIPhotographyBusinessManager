@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
-import Modal from '../components/Modal';
 
 const API = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -10,8 +9,15 @@ const positioningColor = (p) => {
   return m[p] || '#2196f3';
 };
 
-export default function Mileage({ token }) {
-  const [form, setForm] = useState({ session_type: 'Portrait', duration_hours: 2, travel_miles: 0, num_deliverables: 50, market_location: 'US', experience_years: 3 });
+export default function PricingCalculator({ token }) {
+  const [form, setForm] = useState({
+    session_type: 'Portrait',
+    duration_hours: 2,
+    travel_miles: 0,
+    num_deliverables: 50,
+    market_location: 'US',
+    experience_years: 3
+  });
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const headers = { Authorization: `Bearer ${token}` };
@@ -33,6 +39,7 @@ export default function Mileage({ token }) {
       <div className="page-header">
         <div><h1>AI Pricing Calculator</h1><p>Get AI-powered pricing recommendations based on your session details and market positioning</p></div>
       </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: result ? '1fr 1.5fr' : '1fr', gap: 24 }}>
         <div style={{ background: 'var(--bg-card)', padding: 24, borderRadius: 8, border: '1px solid var(--border)' }}>
           <h3 style={{ margin: '0 0 20px' }}>Session Details</h3>
@@ -72,16 +79,22 @@ export default function Mileage({ token }) {
             {loading ? 'Calculating...' : 'Calculate AI Pricing'}
           </button>
         </div>
+
         {result && (
           <div>
+            {/* Main price card */}
             <div style={{ background: 'var(--bg-card)', padding: 24, borderRadius: 8, border: '1px solid var(--border)', marginBottom: 20, textAlign: 'center' }}>
               <div style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 8 }}>Recommended Price</div>
               <div style={{ fontSize: 48, fontWeight: 700, color: 'var(--success)' }}>${(result.recommended_price || 0).toLocaleString()}</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>Range: ${(result.price_range?.minimum || 0).toLocaleString()} - ${(result.price_range?.maximum || 0).toLocaleString()}</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
+                Range: ${(result.price_range?.minimum || 0).toLocaleString()} – ${(result.price_range?.maximum || 0).toLocaleString()}
+              </div>
               <span style={{ display: 'inline-block', marginTop: 12, padding: '4px 16px', borderRadius: 20, background: positioningColor(result.market_positioning), color: '#fff', fontWeight: 600, textTransform: 'capitalize' }}>
                 {result.market_positioning} Market
               </span>
             </div>
+
+            {/* Breakdown */}
             {result.pricing_breakdown && Object.keys(result.pricing_breakdown).length > 0 && (
               <div style={{ background: 'var(--bg-card)', padding: 20, borderRadius: 8, border: '1px solid var(--border)', marginBottom: 16 }}>
                 <h4 style={{ margin: '0 0 12px' }}>Price Breakdown</h4>
@@ -93,12 +106,14 @@ export default function Mileage({ token }) {
                 ))}
               </div>
             )}
+
             {result.competitive_analysis && (
               <div style={{ background: 'var(--bg-input)', padding: 16, borderRadius: 8, marginBottom: 16 }}>
                 <strong>Market Analysis:</strong>
                 <p style={{ margin: '6px 0 0', color: 'var(--text-secondary)', fontSize: 14 }}>{result.competitive_analysis}</p>
               </div>
             )}
+
             {result.upsell_opportunities?.length > 0 && (
               <div style={{ background: 'var(--bg-card)', padding: 16, borderRadius: 8, border: '1px solid var(--border)', marginBottom: 16 }}>
                 <h4 style={{ margin: '0 0 8px' }}>Upsell Opportunities</h4>
@@ -107,6 +122,7 @@ export default function Mileage({ token }) {
                 </ul>
               </div>
             )}
+
             {result.package_suggestion && (
               <div style={{ background: 'var(--bg-input)', padding: 16, borderRadius: 8 }}>
                 <strong>Package Suggestion:</strong>

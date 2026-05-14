@@ -22,9 +22,29 @@ import Testimonials from './pages/Testimonials';
 import Mileage from './pages/Mileage';
 import Bookings from './pages/Bookings';
 import Tasks from './pages/Tasks';
+import ShootPlanOptimize from './pages/ShootPlanOptimize';
+import GalleryOrganizationAI from './pages/GalleryOrganizationAI';
 import Layout from './components/Layout';
 import './styles/App.css';
 
+// // === Batch 06 Gaps & Frontend Mounts ===
+import CFAgenticShootOrchestrationPage from './pages/CFAgenticShootOrchestrationPage';
+import CFComputerVisionPhotoAnalysisPage from './pages/CFComputerVisionPhotoAnalysisPage';
+import CFClientCommunicationAutomationPage from './pages/CFClientCommunicationAutomationPage';
+import CFPricingIntelligencePage from './pages/CFPricingIntelligencePage';
+import CFVideoHighlightReelGenerationPage from './pages/CFVideoHighlightReelGenerationPage';
+import GapShootsWithoutShootPage from './pages/GapShootsWithoutShootPage';
+import GapClientsWithoutClientPage from './pages/GapClientsWithoutClientPage';
+import GapGalleriesWithoutGalleryPage from './pages/GapGalleriesWithoutGalleryPage';
+import GapTestimonialsWithoutReviewPage from './pages/GapTestimonialsWithoutReviewPage';
+import GapLimitedStorageIntegrationIntegrationsStubPage from './pages/GapLimitedStorageIntegrationIntegrationsStubPage';
+import GapNoClientProofingWorkflowAdvancedMarkupApprovPage from './pages/GapNoClientProofingWorkflowAdvancedMarkupApprovPage';
+import GapNoPhotographerScheduleOptimizationPage from './pages/GapNoPhotographerScheduleOptimizationPage';
+import GapNoIntegrationWithLightroomCaptureOneEditingPage from './pages/GapNoIntegrationWithLightroomCaptureOneEditingPage';
+import GapNoMarketplaceSellingPrintsProductsPage from './pages/GapNoMarketplaceSellingPrintsProductsPage';
+import GapNoNotificationsModuleGrep0Page from './pages/GapNoNotificationsModuleGrep0Page';
+import GapNoAuditLoggingGrep0Page from './pages/GapNoAuditLoggingGrep0Page';
+import GapNoWebhooksForBookingEventsPage from './pages/GapNoWebhooksForBookingEventsPage';
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [user, setUser] = useState(JSON.parse(localStorage.getItem('user') || 'null'));
@@ -73,9 +93,32 @@ function App() {
           <Route path="/analytics" element={<Analytics token={token} />} />
           <Route path="/testimonials" element={<Testimonials token={token} />} />
           <Route path="/mileage" element={<Mileage token={token} />} />
+          <Route path="/pricing-calculator" element={<Mileage token={token} />} />
           <Route path="/bookings" element={<Bookings token={token} />} />
           <Route path="/tasks" element={<Tasks token={token} />} />
+          <Route path="/style-analyzer" element={<Tasks token={token} />} />
+          <Route path="/shoot-plan-optimize" element={<ShootPlanOptimize token={token} />} />
+          <Route path="/gallery-organization-ai" element={<GalleryOrganizationAI token={token} />} />
           <Route path="*" element={<Navigate to="/" />} />
+        
+          {/* // === Batch 06 Gaps & Frontend Mounts === */}
+          <Route path="/cf-agentic-shoot-orchestration" element={<CFAgenticShootOrchestrationPage />} />
+          <Route path="/cf-computer-vision-photo-analysis" element={<CFComputerVisionPhotoAnalysisPage />} />
+          <Route path="/cf-client-communication-automation" element={<CFClientCommunicationAutomationPage />} />
+          <Route path="/cf-pricing-intelligence" element={<CFPricingIntelligencePage />} />
+          <Route path="/cf-video-highlight-reel-generation" element={<CFVideoHighlightReelGenerationPage />} />
+          <Route path="/gap-shoots-without-shoot" element={<GapShootsWithoutShootPage />} />
+          <Route path="/gap-clients-without-client" element={<GapClientsWithoutClientPage />} />
+          <Route path="/gap-galleries-without-gallery" element={<GapGalleriesWithoutGalleryPage />} />
+          <Route path="/gap-testimonials-without-review" element={<GapTestimonialsWithoutReviewPage />} />
+          <Route path="/gap-limited-storage-integration-integrations-stub" element={<GapLimitedStorageIntegrationIntegrationsStubPage />} />
+          <Route path="/gap-no-client-proofing-workflow-advanced-markup-approv" element={<GapNoClientProofingWorkflowAdvancedMarkupApprovPage />} />
+          <Route path="/gap-no-photographer-schedule-optimization" element={<GapNoPhotographerScheduleOptimizationPage />} />
+          <Route path="/gap-no-integration-with-lightroom-capture-one-editing-" element={<GapNoIntegrationWithLightroomCaptureOneEditingPage />} />
+          <Route path="/gap-no-marketplace-selling-prints-products" element={<GapNoMarketplaceSellingPrintsProductsPage />} />
+          <Route path="/gap-no-notifications-module-grep-0" element={<GapNoNotificationsModuleGrep0Page />} />
+          <Route path="/gap-no-audit-logging-grep-0" element={<GapNoAuditLoggingGrep0Page />} />
+          <Route path="/gap-no-webhooks-for-booking-events" element={<GapNoWebhooksForBookingEventsPage />} />
         </Routes>
       </Layout>
       <ToastContainer position="bottom-right" theme="dark" />

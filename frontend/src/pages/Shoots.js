@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
@@ -15,6 +15,13 @@ export default function Shoots({ token }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyShoot);
   const [editing, setEditing] = useState(false);
+  const [sessionPhotos, setSessionPhotos] = useState([]);
+  const [photosLoading, setPhotosLoading] = useState(false);
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [galleryEmail, setGalleryEmail] = useState(null);
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [scoringPhotoId, setScoringPhotoId] = useState(null);
+  const fileInputRef = useRef(null);
 
   const headers = { Authorization: `Bearer ${token}` };
 
@@ -54,6 +61,58 @@ export default function Shoots({ token }) {
   const handleEdit = (item) => { setForm(item); setEditing(true); setShowForm(true); setSelected(null); };
   const handleNew = () => { setForm(emptyShoot); setEditing(false); setShowForm(true); };
 
+  const loadSessionPhotos = async (sessionId) => {
+    setPhotosLoading(true);
+    try {
+      const res = await axios.get(`${API}/api/sessions/${sessionId}/photos`, { headers });
+      setSessionPhotos(res.data);
+    } catch (err) { setSessionPhotos([]); }
+    setPhotosLoading(false);
+  };
+
+  const handlePhotoUpload = async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setUploadLoading(true);
+    try {
+      const formData = new FormData();
+      for (let i = 0; i < files.length; i++) formData.append('photos', files[i]);
+      await axios.post(`${API}/api/sessions/${selected.id}/upload-photos`, formData, {
+        headers: { ...headers, 'Content-Type': 'multipart/form-data' }
+      });
+      toast.success(`${files.length} photo(s) uploaded!`);
+      await loadSessionPhotos(selected.id);
+    } catch (err) { toast.error('Upload failed: ' + (err.response?.data?.error || err.message)); }
+    setUploadLoading(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleScorePhoto = async (photoId) => {
+    setScoringPhotoId(photoId);
+    try {
+      const res = await axios.post(`${API}/api/photos/${photoId}/ai-score`, {}, { headers });
+      toast.success(`Photo scored: ${res.data.scores?.overall}/100`);
+      await loadSessionPhotos(selected.id);
+    } catch (err) { toast.error('Scoring failed: ' + (err.response?.data?.error || err.message)); }
+    setScoringPhotoId(null);
+  };
+
+  const handleGenerateGalleryEmail = async () => {
+    setEmailLoading(true); setGalleryEmail(null);
+    try {
+      const res = await axios.post(`${API}/api/sessions/${selected.id}/generate-gallery-email`, {}, { headers });
+      setGalleryEmail(res.data);
+      toast.success('Gallery email generated!');
+    } catch (err) { toast.error('Failed to generate email'); }
+    setEmailLoading(false);
+  };
+
+  const scoreColor = (score) => {
+    if (score >= 80) return '#4caf50';
+    if (score >= 60) return '#ff9800';
+    return '#f44336';
+  };
+
   const statusBadge = (s) => {
     const m = { Completed: 'badge-success', Scheduled: 'badge-info', Cancelled: 'badge-danger', 'In Progress': 'badge-warning' };
     return m[s] || 'badge-draft';
@@ -80,7 +139,7 @@ export default function Shoots({ token }) {
             <div className="detail-actions">
               <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(selected)}>Edit</button>
               <button className="btn btn-danger btn-sm" onClick={() => handleDelete(selected.id)}>Delete</button>
-              <button className="btn btn-secondary btn-sm" onClick={() => setSelected(null)}>Close</button>
+              <button className="btn btn-secondary btn-sm" onClick={() => { setSelected(null); setSessionPhotos([]); setGalleryEmail(null); }}>Close</button>
             </div>
           </div>
           <div className="detail-grid">
@@ -93,6 +152,84 @@ export default function Shoots({ token }) {
             <div className="detail-field"><label>Price</label><div className="value" style={{ fontSize: 18, fontWeight: 700, color: 'var(--success)' }}>${parseFloat(selected.price || 0).toLocaleString()}</div></div>
             <div className="detail-field"><label>Notes</label><div className="value">{selected.notes || 'No notes'}</div></div>
           </div>
+
+          {/* Photo Upload Gallery */}
+          <div style={{ marginTop: 24, borderTop: '1px solid var(--border)', paddingTop: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 style={{ margin: 0 }}>Session Photos</h3>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <label>
+                  <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handlePhotoUpload} />
+                  <button className="btn btn-primary btn-sm" onClick={() => fileInputRef.current?.click()} disabled={uploadLoading}>
+                    {uploadLoading ? 'Uploading...' : 'Upload Photos (max 10)'}
+                  </button>
+                </label>
+                <button className="btn btn-secondary btn-sm" onClick={() => loadSessionPhotos(selected.id)} disabled={photosLoading}>
+                  {photosLoading ? 'Loading...' : 'Load Photos'}
+                </button>
+                <button className="btn btn-success btn-sm" onClick={handleGenerateGalleryEmail} disabled={emailLoading}>
+                  {emailLoading ? 'Generating...' : 'Generate Gallery Email'}
+                </button>
+              </div>
+            </div>
+
+            {sessionPhotos.length > 0 && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+                {sessionPhotos.map(photo => (
+                  <div key={photo.id} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                    <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{photo.file_name}</div>
+                      {photo.overall_score > 0 ? (
+                        <div>
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+                            <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 10, background: scoreColor(photo.overall_score), color: '#fff', fontWeight: 700 }}>
+                              {photo.overall_score}/100
+                            </span>
+                            {photo.client_delivery_ready && <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 10, background: '#4caf50', color: '#fff' }}>Delivery Ready</span>}
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                            Comp: {photo.composition_score} | Light: {photo.lighting_score} | Focus: {photo.focus_score}
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Not scored yet</div>
+                      )}
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => handleScorePhoto(photo.id)}
+                        disabled={scoringPhotoId === photo.id}
+                        style={{ fontSize: 11 }}
+                      >
+                        {scoringPhotoId === photo.id ? 'Scoring...' : 'AI Score'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {sessionPhotos.length === 0 && !photosLoading && (
+              <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 16 }}>No photos uploaded yet. Click "Load Photos" or upload new ones.</p>
+            )}
+          </div>
+
+          {/* Gallery Email */}
+          {galleryEmail && (
+            <div style={{ marginTop: 20, padding: 20, background: 'var(--bg-input)', borderRadius: 8, border: '1px solid var(--border)' }}>
+              <h4 style={{ margin: '0 0 12px', color: 'var(--accent)' }}>Generated Gallery Email</h4>
+              <div style={{ marginBottom: 8 }}><strong>Subject:</strong> {galleryEmail.subject}</div>
+              <div style={{ background: '#fff', padding: 16, borderRadius: 6, border: '1px solid #ddd', whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.7 }}>
+                {galleryEmail.email_body}
+              </div>
+              {galleryEmail.highlight_photos?.length > 0 && (
+                <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+                  <strong>Highlight Photos:</strong> {galleryEmail.highlight_photos.join(', ')}
+                </div>
+              )}
+              <button className="btn btn-secondary btn-sm" style={{ marginTop: 10 }} onClick={() => navigator.clipboard?.writeText(galleryEmail.email_body).then(() => toast.success('Email copied!'))}>
+                Copy Email Body
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -101,7 +238,7 @@ export default function Shoots({ token }) {
           <thead><tr><th>Title</th><th>Client</th><th>Date</th><th>Type</th><th>Location</th><th>Price</th><th>Status</th></tr></thead>
           <tbody>
             {items.map(s => (
-              <tr key={s.id} onClick={() => setSelected(s)}>
+              <tr key={s.id} onClick={() => { setSelected(s); setSessionPhotos([]); setGalleryEmail(null); loadSessionPhotos(s.id); }}>
                 <td style={{ fontWeight: 600 }}>{s.title}</td>
                 <td>{s.client_name || 'N/A'}</td>
                 <td>{s.shoot_date ? new Date(s.shoot_date).toLocaleDateString() : 'TBD'}</td>

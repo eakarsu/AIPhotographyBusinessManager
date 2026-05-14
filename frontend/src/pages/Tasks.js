@@ -1,254 +1,142 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
-import Modal from '../components/Modal';
 
 const API = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
-const emptyTask = { title: '', category: 'General', description: '', due_date: '', priority: 'Medium', related_shoot: '', status: 'To Do' };
-
 export default function Tasks({ token }) {
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState(null);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(emptyTask);
-  const [editing, setEditing] = useState(false);
-
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const fileInputRef = useRef(null);
   const headers = { Authorization: `Bearer ${token}` };
 
-  const fetchData = async () => {
+  const handleFilesSelected = (e) => {
+    const files = Array.from(e.target.files).slice(0, 5);
+    setSelectedFiles(files);
+  };
+
+  const handleAnalyze = async () => {
+    if (selectedFiles.length === 0) return toast.error('Select at least 1 portfolio photo');
+    setLoading(true); setResult(null);
     try {
-      const res = await axios.get(`${API}/api/tasks`, { headers });
-      setItems(res.data);
+      const formData = new FormData();
+      selectedFiles.forEach(f => formData.append('photos', f));
+      const res = await axios.post(`${API}/api/ai/style-analyzer`, formData, {
+        headers: { ...headers, 'Content-Type': 'multipart/form-data' }
+      });
+      setResult(res.data);
+      toast.success('Style analysis complete!');
     } catch (err) {
-      toast.error('Failed to load tasks');
-    } finally {
-      setLoading(false);
+      toast.error('Style analysis failed: ' + (err.response?.data?.error || err.message));
     }
+    setLoading(false);
   };
-
-  useEffect(() => { fetchData(); }, []);
-
-  const handleSave = async () => {
-    try {
-      if (editing) {
-        await axios.put(`${API}/api/tasks/${form.id}`, form, { headers });
-        toast.success('Task updated');
-      } else {
-        await axios.post(`${API}/api/tasks`, form, { headers });
-        toast.success('Task created');
-      }
-      setShowForm(false);
-      setForm(emptyTask);
-      setEditing(false);
-      setSelected(null);
-      fetchData();
-    } catch (err) {
-      toast.error('Failed to save task');
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm('Delete this task?')) return;
-    try {
-      await axios.delete(`${API}/api/tasks/${id}`, { headers });
-      toast.success('Task deleted');
-      setSelected(null);
-      fetchData();
-    } catch (err) {
-      toast.error('Failed to delete task');
-    }
-  };
-
-  const handleEdit = (item) => {
-    setForm(item);
-    setEditing(true);
-    setShowForm(true);
-    setSelected(null);
-  };
-
-  const handleNew = () => {
-    setForm(emptyTask);
-    setEditing(false);
-    setShowForm(true);
-  };
-
-  const handleToggle = async (item) => {
-    const newStatus = item.status === 'Completed' ? 'To Do' : 'Completed';
-    try {
-      await axios.put(`${API}/api/tasks/${item.id}`, { ...item, status: newStatus }, { headers });
-      toast.success(newStatus === 'Completed' ? 'Task completed!' : 'Task reopened');
-      fetchData();
-    } catch (err) {
-      toast.error('Failed to update task');
-    }
-  };
-
-  const statusBadge = (s) => {
-    const map = { 'To Do': 'badge-info', 'In Progress': 'badge-warning', 'Completed': 'badge-success', 'On Hold': 'badge-draft' };
-    return map[s] || 'badge-draft';
-  };
-
-  const priorityColor = (p) => {
-    const map = { High: '#ef4444', Medium: '#f59e0b', Low: '#22c55e' };
-    return map[p] || '#6b7280';
-  };
-
-  const todoCount = items.filter(t => t.status === 'To Do').length;
-  const inProgressCount = items.filter(t => t.status === 'In Progress').length;
-  const completedCount = items.filter(t => t.status === 'Completed').length;
-  const overdueCount = items.filter(t => {
-    if (!t.due_date || t.status === 'Completed') return false;
-    return new Date(t.due_date) < new Date();
-  }).length;
-
-  if (loading) return <div className="loading"><div className="spinner"></div> Loading tasks...</div>;
 
   return (
     <div>
       <div className="page-header">
         <div>
-          <h1>Tasks</h1>
-          <p>Manage your to-do list and task priorities</p>
-        </div>
-        <button className="btn btn-primary" onClick={handleNew}>+ Add Task</button>
-      </div>
-
-      <div className="dashboard-grid">
-        <div className="stat-card">
-          <h3>To Do</h3>
-          <div className="stat-value">{todoCount}</div>
-        </div>
-        <div className="stat-card">
-          <h3>In Progress</h3>
-          <div className="stat-value">{inProgressCount}</div>
-        </div>
-        <div className="stat-card">
-          <h3>Completed</h3>
-          <div className="stat-value">{completedCount}</div>
-        </div>
-        <div className="stat-card">
-          <h3>Overdue</h3>
-          <div className="stat-value" style={{ color: overdueCount > 0 ? '#ef4444' : 'inherit' }}>{overdueCount}</div>
+          <h1>AI Style Analyzer</h1>
+          <p>Upload portfolio photos to discover your distinctive photography style signature</p>
         </div>
       </div>
 
-      {selected && (
-        <div className="detail-view">
-          <div className="detail-header">
-            <div>
-              <h2>{selected.title}</h2>
-              <span className={`badge ${statusBadge(selected.status)}`}>{selected.status}</span>
-            </div>
-            <div className="detail-actions">
-              <button className="btn btn-secondary btn-sm" onClick={() => handleToggle(selected)}>
-                {selected.status === 'Completed' ? 'Reopen' : 'Complete'}
-              </button>
-              <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(selected)}>Edit</button>
-              <button className="btn btn-danger btn-sm" onClick={() => handleDelete(selected.id)}>Delete</button>
-              <button className="btn btn-secondary btn-sm" onClick={() => setSelected(null)}>Close</button>
-            </div>
-          </div>
-          <div className="detail-grid">
-            <div className="detail-field"><label>Category</label><div className="value">{selected.category}</div></div>
-            <div className="detail-field"><label>Priority</label><div className="value" style={{ color: priorityColor(selected.priority), fontWeight: 700 }}>{selected.priority}</div></div>
-            <div className="detail-field"><label>Due Date</label><div className="value">{selected.due_date ? new Date(selected.due_date).toLocaleDateString() : 'No deadline'}</div></div>
-            <div className="detail-field"><label>Related Shoot</label><div className="value">{selected.related_shoot || 'None'}</div></div>
-            <div className="detail-field"><label>Description</label><div className="value">{selected.description || 'No description'}</div></div>
-            <div className="detail-field"><label>Created</label><div className="value">{selected.created_at ? new Date(selected.created_at).toLocaleDateString() : 'N/A'}</div></div>
-          </div>
+      <div style={{ background: 'var(--bg-card)', padding: 24, borderRadius: 8, border: '1px solid var(--border)', marginBottom: 24, maxWidth: 600 }}>
+        <h3 style={{ margin: '0 0 16px' }}>Upload Portfolio Photos</h3>
+        <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 16 }}>
+          Upload 2-5 of your best portfolio photos. The AI will analyze lighting, composition, color tones, and identify your unique style signature.
+        </p>
+        <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handleFilesSelected} />
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button className="btn btn-secondary" onClick={() => fileInputRef.current?.click()}>Select Photos (max 5)</button>
+          {selectedFiles.length > 0 && (
+            <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
+              {selectedFiles.length} photo(s): {selectedFiles.map(f => f.name).join(', ')}
+            </span>
+          )}
+        </div>
+        {selectedFiles.length > 0 && (
+          <button className="btn btn-primary" style={{ marginTop: 16, width: '100%' }} onClick={handleAnalyze} disabled={loading}>
+            {loading ? 'Analyzing Style...' : 'Analyze My Style with AI'}
+          </button>
+        )}
+      </div>
+
+      {loading && (
+        <div style={{ textAlign: 'center', padding: 40 }}>
+          <div className="spinner" style={{ width: 40, height: 40, margin: '0 auto 16px' }}></div>
+          <p>AI is analyzing your photography style...</p>
         </div>
       )}
 
-      <div className="data-table-container">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th style={{ width: 40 }}></th>
-              <th>Task</th>
-              <th>Category</th>
-              <th>Priority</th>
-              <th>Due Date</th>
-              <th>Related Shoot</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map(t => {
-              const isOverdue = t.due_date && t.status !== 'Completed' && new Date(t.due_date) < new Date();
-              return (
-                <tr key={t.id} onClick={() => setSelected(t)} style={{ opacity: t.status === 'Completed' ? 0.6 : 1 }}>
-                  <td onClick={e => { e.stopPropagation(); handleToggle(t); }} style={{ cursor: 'pointer', textAlign: 'center', fontSize: 18 }}>
-                    {t.status === 'Completed' ? '\u2705' : '\u2B1C'}
-                  </td>
-                  <td style={{ fontWeight: 600, textDecoration: t.status === 'Completed' ? 'line-through' : 'none' }}>{t.title}</td>
-                  <td>{t.category}</td>
-                  <td style={{ color: priorityColor(t.priority), fontWeight: 600 }}>{t.priority}</td>
-                  <td style={{ color: isOverdue ? '#ef4444' : 'inherit', fontWeight: isOverdue ? 600 : 400 }}>
-                    {t.due_date ? new Date(t.due_date).toLocaleDateString() : 'No deadline'}
-                    {isOverdue && ' (overdue)'}
-                  </td>
-                  <td>{t.related_shoot || 'N/A'}</td>
-                  <td><span className={`badge ${statusBadge(t.status)}`}>{t.status}</span></td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {showForm && (
-        <Modal
-          title={editing ? 'Edit Task' : 'New Task'}
-          onClose={() => { setShowForm(false); setEditing(false); setForm(emptyTask); }}
-          footer={
-            <>
-              <button className="btn btn-secondary" onClick={() => { setShowForm(false); setEditing(false); setForm(emptyTask); }}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleSave}>{editing ? 'Update' : 'Create'}</button>
-            </>
-          }
-        >
-          <div className="form-group">
-            <label>Title</label>
-            <input value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="Task title" />
-          </div>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Category</label>
-              <select value={form.category} onChange={e => setForm({...form, category: e.target.value})}>
-                <option>General</option><option>Editing</option><option>Delivery</option><option>Communication</option>
-                <option>Accounting</option><option>Marketing</option><option>Equipment</option><option>Admin</option>
-              </select>
-            </div>
-            <div className="form-group">
-              <label>Priority</label>
-              <select value={form.priority} onChange={e => setForm({...form, priority: e.target.value})}>
-                <option>High</option><option>Medium</option><option>Low</option>
-              </select>
+      {result && !loading && (
+        <div>
+          <div style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-secondary))', padding: 32, borderRadius: 12, marginBottom: 24, color: '#fff', textAlign: 'center' }}>
+            <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 2, marginBottom: 12, opacity: 0.8 }}>Your Style Signature</div>
+            <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.4 }}>{result.style_signature}</div>
+            <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+              {(result.style_tags || []).map((tag, i) => (
+                <span key={i} style={{ padding: '4px 12px', background: 'rgba(255,255,255,0.2)', borderRadius: 20, fontSize: 12 }}>{tag}</span>
+              ))}
             </div>
           </div>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Due Date</label>
-              <input type="date" value={form.due_date ? form.due_date.substring(0, 10) : ''} onChange={e => setForm({...form, due_date: e.target.value})} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
+            {result.lighting_preferences && (
+              <div style={{ background: 'var(--bg-card)', padding: 20, borderRadius: 8, border: '1px solid var(--border)' }}>
+                <h4 style={{ margin: '0 0 12px', color: 'var(--accent)' }}>Lighting Style</h4>
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>{result.lighting_preferences.primary_style}</div>
+                <ul style={{ margin: 0, paddingLeft: 16, fontSize: 13, color: 'var(--text-secondary)' }}>
+                  {(result.lighting_preferences.characteristics || []).map((c, i) => <li key={i}>{c}</li>)}
+                </ul>
+              </div>
+            )}
+            {result.color_palette && (
+              <div style={{ background: 'var(--bg-card)', padding: 20, borderRadius: 8, border: '1px solid var(--border)' }}>
+                <h4 style={{ margin: '0 0 12px', color: 'var(--accent)' }}>Color and Editing</h4>
+                <div style={{ marginBottom: 6 }}><strong>Editing Style:</strong> {result.color_palette.editing_style}</div>
+                <div style={{ marginBottom: 6 }}><strong>Color Grading:</strong> {result.color_palette.color_grading}</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                  {(result.color_palette.dominant_tones || []).map((t, i) => (
+                    <span key={i} style={{ padding: '3px 10px', background: 'var(--bg-input)', borderRadius: 12, fontSize: 12 }}>{t}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {result.composition_patterns && (
+              <div style={{ background: 'var(--bg-card)', padding: 20, borderRadius: 8, border: '1px solid var(--border)' }}>
+                <h4 style={{ margin: '0 0 12px', color: 'var(--accent)' }}>Composition</h4>
+                <div style={{ marginBottom: 6 }}><strong>Framing:</strong> {result.composition_patterns.preferred_framing}</div>
+                <div style={{ marginBottom: 6 }}><strong>Depth of Field:</strong> {result.composition_patterns.depth_of_field}</div>
+                <div style={{ marginBottom: 6 }}><strong>Perspective:</strong> {result.composition_patterns.perspective}</div>
+                <div><strong>Rule of Thirds:</strong> {result.composition_patterns.rule_of_thirds_usage}</div>
+              </div>
+            )}
+            <div style={{ background: 'var(--bg-card)', padding: 20, borderRadius: 8, border: '1px solid var(--border)' }}>
+              <h4 style={{ margin: '0 0 12px', color: 'var(--accent)' }}>Best Genre Fit</h4>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {(result.genre_fit || []).map((g, i) => (
+                  <span key={i} style={{ padding: '4px 12px', background: 'var(--bg-input)', borderRadius: 20, fontSize: 13 }}>{g}</span>
+                ))}
+              </div>
+              {result.mood_and_emotion && (
+                <div style={{ marginTop: 12, padding: '10px 12px', background: 'var(--bg-input)', borderRadius: 6, fontSize: 14, fontStyle: 'italic' }}>"{result.mood_and_emotion}"</div>
+              )}
             </div>
-            <div className="form-group">
-              <label>Status</label>
-              <select value={form.status} onChange={e => setForm({...form, status: e.target.value})}>
-                <option>To Do</option><option>In Progress</option><option>Completed</option><option>On Hold</option>
-              </select>
-            </div>
+            {result.client_appeal && (
+              <div style={{ background: 'var(--bg-card)', padding: 20, borderRadius: 8, border: '1px solid var(--border)' }}>
+                <h4 style={{ margin: '0 0 12px', color: 'var(--accent)' }}>Ideal Client</h4>
+                <p style={{ margin: 0, fontSize: 14, color: 'var(--text-secondary)' }}>{result.client_appeal}</p>
+              </div>
+            )}
+            {result.differentiation && (
+              <div style={{ background: 'var(--bg-card)', padding: 20, borderRadius: 8, border: '1px solid var(--border)' }}>
+                <h4 style={{ margin: '0 0 12px', color: 'var(--accent)' }}>What Makes You Unique</h4>
+                <p style={{ margin: 0, fontSize: 14, color: 'var(--text-secondary)' }}>{result.differentiation}</p>
+              </div>
+            )}
           </div>
-          <div className="form-group">
-            <label>Related Shoot</label>
-            <input value={form.related_shoot} onChange={e => setForm({...form, related_shoot: e.target.value})} placeholder="Related shoot name (optional)" />
-          </div>
-          <div className="form-group">
-            <label>Description</label>
-            <textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="Task description..." />
-          </div>
-        </Modal>
+        </div>
       )}
     </div>
   );

@@ -18,9 +18,29 @@ const navItems = [
   { path: '/email-templates', label: 'Email Templates', icon: '✉️' },
   { path: '/testimonials', label: 'Testimonials', icon: '⭐' },
   { path: '/analytics', label: 'Analytics', icon: '📈' },
-  { path: '/mileage', label: 'Mileage', icon: '🚗' },
+  { path: '/pricing-calculator', label: 'AI Pricing', icon: '💲' },
+  { path: '/style-analyzer', label: 'Style Analyzer', icon: '🎭' },
   { path: '/bookings', label: 'Bookings', icon: '📩' },
-  { path: '/tasks', label: 'Tasks', icon: '✅' },
+  { path: '/shoot-plan-optimize', label: 'Shoot Plan AI', icon: '🗺️' },
+  { path: '/gallery-organization-ai', label: 'Gallery Org AI', icon: '🗂️' },
+  // === Batch 06 Gaps & Frontend Mounts ===
+  { path: '/cf-agentic-shoot-orchestration', label: 'Agentic shoot orchestration', icon: '✨' },
+  { path: '/cf-computer-vision-photo-analysis', label: 'Computer vision photo analysis', icon: '✨' },
+  { path: '/cf-client-communication-automation', label: 'Client communication automation', icon: '✨' },
+  { path: '/cf-pricing-intelligence', label: 'Pricing intelligence', icon: '✨' },
+  { path: '/cf-video-highlight-reel-generation', label: 'Video highlight reel generation', icon: '✨' },
+  { path: '/gap-shoots-without-shoot', label: 'Shoots without `/shoot', icon: '✨' },
+  { path: '/gap-clients-without-client', label: 'Clients without `/client', icon: '✨' },
+  { path: '/gap-galleries-without-gallery', label: 'Galleries without `/gallery', icon: '✨' },
+  { path: '/gap-testimonials-without-review', label: 'Testimonials without `/review', icon: '✨' },
+  { path: '/gap-limited-storage-integration-integrations-stub', label: 'Limited storage integration (integrations stub', icon: '✨' },
+  { path: '/gap-no-client-proofing-workflow-advanced-markup-approv', label: 'No client proofing workflow (advanced markup/approval)', icon: '✨' },
+  { path: '/gap-no-photographer-schedule-optimization', label: 'No photographer schedule optimization', icon: '✨' },
+  { path: '/gap-no-integration-with-lightroom-capture-one-editing-', label: 'No integration with Lightroom/Capture One (editing tools)', icon: '✨' },
+  { path: '/gap-no-marketplace-selling-prints-products', label: 'No marketplace (selling prints, products)', icon: '✨' },
+  { path: '/gap-no-notifications-module-grep-0', label: 'No notifications module (grep 0)', icon: '✨' },
+  { path: '/gap-no-audit-logging-grep-0', label: 'No audit logging (grep 0)', icon: '✨' },
+  { path: '/gap-no-webhooks-for-booking-events', label: 'No webhooks for booking events', icon: '✨' }
 ];
 
 export default function Layout({ children, user, onLogout }) {

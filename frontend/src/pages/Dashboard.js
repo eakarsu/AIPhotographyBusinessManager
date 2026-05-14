@@ -26,10 +26,8 @@ export default function Dashboard({ token }) {
       axios.get(`${API}/api/workflows`, { headers }),
       axios.get(`${API}/api/emails`, { headers }),
       axios.get(`${API}/api/testimonials`, { headers }),
-      axios.get(`${API}/api/mileage`, { headers }),
       axios.get(`${API}/api/bookings`, { headers }),
-      axios.get(`${API}/api/tasks`, { headers }),
-    ]).then(([clients, galleries, contracts, invoices, shoots, aiEdits, social, packages, equipment, expenses, portfolio, workflows, emails, testimonials, mileage, bookings, tasks]) => {
+    ]).then(([clients, galleries, contracts, invoices, shoots, aiEdits, social, packages, equipment, expenses, portfolio, workflows, emails, testimonials, bookings]) => {
       const totalRevenue = invoices.data.reduce((sum, i) => sum + parseFloat(i.total || 0), 0);
       const paidRevenue = invoices.data.filter(i => i.status === 'Paid').reduce((sum, i) => sum + parseFloat(i.total || 0), 0);
       const totalExpenses = expenses.data.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
@@ -58,12 +56,8 @@ export default function Dashboard({ token }) {
         activeWorkflows: workflows.data.filter(w => w.status === 'In Progress').length,
         avgRating: testimonials.data.length > 0 ? (testimonials.data.reduce((s, t) => s + (t.rating || 0), 0) / testimonials.data.length).toFixed(1) : '0',
         equipmentValue: equipment.data.reduce((s, e) => s + parseFloat(e.purchase_price || 0), 0),
-        mileage: mileage.data.length,
-        totalMiles: mileage.data.reduce((s, m) => s + parseFloat(m.miles || 0) * (m.is_round_trip ? 2 : 1), 0),
         bookings: bookings.data.length,
         newBookings: bookings.data.filter(b => b.status === 'New').length,
-        tasks: tasks.data.length,
-        pendingTasks: tasks.data.filter(t => t.status === 'To Do' || t.status === 'In Progress').length,
       });
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -89,9 +83,9 @@ export default function Dashboard({ token }) {
     { path: '/email-templates', icon: '✉️', title: 'Email Templates', desc: 'Client communication email templates', count: `${stats.emails} templates` },
     { path: '/testimonials', icon: '⭐', title: 'Testimonials', desc: 'Client reviews and testimonials', count: `${stats.testimonials} reviews` },
     { path: '/analytics', icon: '📈', title: 'Analytics & Reports', desc: 'Business performance insights with AI analysis', count: `$${stats.totalRevenue?.toLocaleString()} revenue` },
-    { path: '/mileage', icon: '🚗', title: 'Mileage Tracker', desc: 'Track business travel for tax deductions', count: `${stats.mileage} trips` },
+    { path: '/pricing-calculator', icon: '💲', title: 'AI Pricing Calculator', desc: 'Get AI-powered pricing recommendations with market positioning analysis', count: 'AI Tool' },
+    { path: '/style-analyzer', icon: '🎭', title: 'AI Style Analyzer', desc: 'Upload portfolio photos to discover your distinctive photography style signature', count: 'Vision AI' },
     { path: '/bookings', icon: '📩', title: 'Booking Requests', desc: 'Manage client inquiries and booking requests', count: `${stats.bookings} requests` },
-    { path: '/tasks', icon: '✅', title: 'Tasks', desc: 'Personal to-do list and task management', count: `${stats.tasks} tasks` },
   ];
 
   return (
