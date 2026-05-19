@@ -45,6 +45,7 @@ import GapNoMarketplaceSellingPrintsProductsPage from './pages/GapNoMarketplaceS
 import GapNoNotificationsModuleGrep0Page from './pages/GapNoNotificationsModuleGrep0Page';
 import GapNoAuditLoggingGrep0Page from './pages/GapNoAuditLoggingGrep0Page';
 import GapNoWebhooksForBookingEventsPage from './pages/GapNoWebhooksForBookingEventsPage';
+import CustomViewsPage from './pages/CustomViewsPage';
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [user, setUser] = useState(JSON.parse(localStorage.getItem('user') || 'null'));
@@ -99,6 +100,7 @@ function App() {
           <Route path="/style-analyzer" element={<Tasks token={token} />} />
           <Route path="/shoot-plan-optimize" element={<ShootPlanOptimize token={token} />} />
           <Route path="/gallery-organization-ai" element={<GalleryOrganizationAI token={token} />} />
+          <Route path="/custom-views" element={<CustomViewsPage token={token} />} />
           <Route path="*" element={<Navigate to="/" />} />
         
           {/* // === Batch 06 Gaps & Frontend Mounts === */}

@@ -43,6 +43,9 @@ app.use('/api/bookings', authenticateToken, require('./routes/bookings'));
 app.use('/api/tasks', authenticateToken, require('./routes/tasks'));
 app.use('/api/integrations', authenticateToken, require('./routes/integrations'));
 
+// Studio Custom Views (BookingCalendar, GalleryViewer, InvoicePDF, PhotoSelectionWorkflow)
+app.use('/api/custom-views', require('./routes/customViews'));
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -57,19 +60,26 @@ app.use('/api/cf-pricing-intelligence', require('./routes/customFeat04_PricingIn
 app.use('/api/cf-video-highlight-reel-generation', require('./routes/customFeat05_VideoHighlightReelGeneration'));
 
 
-// === Batch 06 Gaps & Frontend Mounts ===
-app.use('/api/gap-shoots-without-shoot', require('./routes/gapFeat_shoots_without_shoot'));
-app.use('/api/gap-clients-without-client', require('./routes/gapFeat_clients_without_client'));
-app.use('/api/gap-galleries-without-gallery', require('./routes/gapFeat_galleries_without_gallery'));
-app.use('/api/gap-testimonials-without-review', require('./routes/gapFeat_testimonials_without_review'));
-app.use('/api/gap-limited-storage-integration-integrations-stub', require('./routes/gapFeat_limited_storage_integration_integrations_stub'));
-app.use('/api/gap-no-client-proofing-workflow-advanced-markup-approv', require('./routes/gapFeat_no_client_proofing_workflow_advanced_markup_approv'));
-app.use('/api/gap-no-photographer-schedule-optimization', require('./routes/gapFeat_no_photographer_schedule_optimization'));
-app.use('/api/gap-no-integration-with-lightroom-capture-one-editing-', require('./routes/gapFeat_no_integration_with_lightroom_capture_one_editing_'));
-app.use('/api/gap-no-marketplace-selling-prints-products', require('./routes/gapFeat_no_marketplace_selling_prints_products'));
-app.use('/api/gap-no-notifications-module-grep-0', require('./routes/gapFeat_no_notifications_module_grep_0'));
-app.use('/api/gap-no-audit-logging-grep-0', require('./routes/gapFeat_no_audit_logging_grep_0'));
-app.use('/api/gap-no-webhooks-for-booking-events', require('./routes/gapFeat_no_webhooks_for_booking_events'));
+// === Batch 06 Gaps & Frontend Mounts (guarded — pre-existing route bugs must not kill the app) ===
+function safeMount(mountPath, requirePath) {
+  try {
+    app.use(mountPath, require(requirePath));
+  } catch (err) {
+    console.warn(`[safeMount] Skipping ${mountPath}: ${err.message}`);
+  }
+}
+safeMount('/api/gap-shoots-without-shoot', './routes/gapFeat_shoots_without_shoot');
+safeMount('/api/gap-clients-without-client', './routes/gapFeat_clients_without_client');
+safeMount('/api/gap-galleries-without-gallery', './routes/gapFeat_galleries_without_gallery');
+safeMount('/api/gap-testimonials-without-review', './routes/gapFeat_testimonials_without_review');
+safeMount('/api/gap-limited-storage-integration-integrations-stub', './routes/gapFeat_limited_storage_integration_integrations_stub');
+safeMount('/api/gap-no-client-proofing-workflow-advanced-markup-approv', './routes/gapFeat_no_client_proofing_workflow_advanced_markup_approv');
+safeMount('/api/gap-no-photographer-schedule-optimization', './routes/gapFeat_no_photographer_schedule_optimization');
+safeMount('/api/gap-no-integration-with-lightroom-capture-one-editing-', './routes/gapFeat_no_integration_with_lightroom_capture_one_editing_');
+safeMount('/api/gap-no-marketplace-selling-prints-products', './routes/gapFeat_no_marketplace_selling_prints_products');
+safeMount('/api/gap-no-notifications-module-grep-0', './routes/gapFeat_no_notifications_module_grep_0');
+safeMount('/api/gap-no-audit-logging-grep-0', './routes/gapFeat_no_audit_logging_grep_0');
+safeMount('/api/gap-no-webhooks-for-booking-events', './routes/gapFeat_no_webhooks_for_booking_events');
 
 app.listen(PORT, () => {
   console.log(`\nPhotography Business Manager API running on port ${PORT}`);

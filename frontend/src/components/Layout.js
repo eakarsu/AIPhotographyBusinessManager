@@ -23,6 +23,7 @@ const navItems = [
   { path: '/bookings', label: 'Bookings', icon: '📩' },
   { path: '/shoot-plan-optimize', label: 'Shoot Plan AI', icon: '🗺️' },
   { path: '/gallery-organization-ai', label: 'Gallery Org AI', icon: '🗂️' },
+  { path: '/custom-views', label: 'Studio Views', icon: '🎬' },
   // === Batch 06 Gaps & Frontend Mounts ===
   { path: '/cf-agentic-shoot-orchestration', label: 'Agentic shoot orchestration', icon: '✨' },
   { path: '/cf-computer-vision-photo-analysis', label: 'Computer vision photo analysis', icon: '✨' },
