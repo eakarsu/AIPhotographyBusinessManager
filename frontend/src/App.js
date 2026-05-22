@@ -46,6 +46,9 @@ import GapNoNotificationsModuleGrep0Page from './pages/GapNoNotificationsModuleG
 import GapNoAuditLoggingGrep0Page from './pages/GapNoAuditLoggingGrep0Page';
 import GapNoWebhooksForBookingEventsPage from './pages/GapNoWebhooksForBookingEventsPage';
 import CustomViewsPage from './pages/CustomViewsPage';
+import CodexCustomVizFeature from './pages/CodexCustomVizFeature';
+import CodexOperationsFeature from './pages/CodexOperationsFeature';
+
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [user, setUser] = useState(JSON.parse(localStorage.getItem('user') || 'null'));
@@ -77,6 +80,9 @@ function App() {
     <Router>
       <Layout user={user} onLogout={handleLogout}>
         <Routes>
+        <Route path="/codex/custom-viz" element={<CodexCustomVizFeature />} />
+        <Route path="/codex/operations" element={<CodexOperationsFeature />} />
+
           <Route path="/" element={<Dashboard token={token} />} />
           <Route path="/clients" element={<Clients token={token} />} />
           <Route path="/galleries" element={<Galleries token={token} />} />
