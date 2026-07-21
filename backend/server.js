@@ -3,17 +3,21 @@ const cors = require('cors');
 const path = require('path');
 const helmet = require('helmet');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+const { validateRuntime } = require('./governance/runtime');
+const { createProviderGate } = require('./governance/providerGate');
+const governanceRouter = require('./governance/router');
+
+validateRuntime();
 
 const app = express();
 const PORT = process.env.BACKEND_PORT || 3001;
 
 // Security
 app.use(helmet());
-app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
-  credentials: true
-}));
+const allowedOrigins = String(process.env.CORS_ORIGINS || process.env.CLIENT_URL || 'http://localhost:3000').split(',').map((value) => value.trim()).filter(Boolean);
+app.use(cors({ origin: (origin, callback) => !origin || allowedOrigins.includes(origin) ? callback(null, true) : callback(new Error('Origin not allowed by CORS')), credentials: true }));
 app.use(express.json({ limit: '50mb' }));
+app.use(createProviderGate(['/api/ai', '/api/gap', '/api/cf']));
 
 const { authenticateToken } = require('./middleware/auth');
 
@@ -42,9 +46,10 @@ app.use('/api/mileage', authenticateToken, require('./routes/mileage'));
 app.use('/api/bookings', authenticateToken, require('./routes/bookings'));
 app.use('/api/tasks', authenticateToken, require('./routes/tasks'));
 app.use('/api/integrations', authenticateToken, require('./routes/integrations'));
+app.use('/api/governed-photography-releases', governanceRouter);
 
 // Studio Custom Views (BookingCalendar, GalleryViewer, InvoicePDF, PhotoSelectionWorkflow)
-app.use('/api/custom-views', require('./routes/customViews'));
+app.use('/api/custom-views', authenticateToken, require('./routes/customViews'));
 
 // Health check
 app.get('/api/health', (req, res) => {
