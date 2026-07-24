@@ -1,7 +1,6 @@
 const express = require('express');
 const pool = require('../db');
 const { authenticateToken, aiRateLimiter } = require('../middleware/auth');
-const https = require('https');
 const multer = require('multer');
 
 const router = express.Router();
@@ -37,18 +36,11 @@ function parseAIJson(text) {
   return null;
 }
 
-function callOpenRouter(prompt, systemPrompt, messages = null) {
-  return new Promise((resolve, reject) => {
+async function callOpenRouter(prompt, systemPrompt, messages = null) {
     const apiKey = process.env.OPENROUTER_API_KEY;
     const model = process.env.OPENROUTER_MODEL || 'anthropic/claude-3-5-sonnet-20241022';
 
-    if (!apiKey || apiKey === 'your-openrouter-key-here') {
-      return resolve({
-        ai_response: `[AI Demo Mode] Configure OPENROUTER_API_KEY for live AI.\n\nSimulated response for: "${(prompt || '').substring(0, 100)}..."`,
-        model: model,
-        usage: { prompt_tokens: 0, completion_tokens: 0 }
-      });
-    }
+    if (!apiKey || apiKey === 'your-openrouter-key-here') throw new Error('OPENROUTER_API_KEY is required');
 
     const body = messages ? {
       model,
@@ -65,45 +57,28 @@ function callOpenRouter(prompt, systemPrompt, messages = null) {
       temperature: 0.7
     };
 
-    const data = JSON.stringify(body);
-
-    const options = {
-      hostname: 'openrouter.ai',
-      path: '/api/v1/chat/completions',
+    const baseUrl = (process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/+$/, '');
+    const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': 'http://localhost:3000',
+        'HTTP-Referer': process.env.CLIENT_URL || 'http://localhost:3000',
         'X-Title': 'AI Photography Business Manager'
-      }
-    };
-
-    const req = https.request(options, (res) => {
-      let body = '';
-      res.on('data', (chunk) => body += chunk);
-      res.on('end', () => {
-        try {
-          const parsed = JSON.parse(body);
-          if (parsed.error) {
-            resolve({ ai_response: `AI Error: ${parsed.error.message}`, model, usage: { prompt_tokens: 0, completion_tokens: 0 } });
-          } else {
-            resolve({
-              ai_response: parsed.choices[0].message.content,
-              model: parsed.model || model,
-              usage: parsed.usage || { prompt_tokens: 0, completion_tokens: 0 }
-            });
-          }
-        } catch (e) {
-          resolve({ ai_response: `AI parsing error`, model, usage: { prompt_tokens: 0, completion_tokens: 0 } });
-        }
-      });
+      },
+      body: JSON.stringify(body),
     });
-
-    req.on('error', (e) => resolve({ ai_response: `AI connection error: ${e.message}`, model, usage: { prompt_tokens: 0, completion_tokens: 0 } }));
-    req.write(data);
-    req.end();
-  });
+    const raw = await response.text();
+    let parsed;
+    try { parsed = JSON.parse(raw); } catch (_) { throw new Error(`OpenRouter returned invalid JSON (${response.status})`); }
+    if (!response.ok || parsed.error) throw new Error(parsed.error?.message || `OpenRouter request failed (${response.status})`);
+    const content = parsed.choices?.[0]?.message?.content;
+    if (!content) throw new Error('OpenRouter returned no content');
+    return {
+      ai_response: content,
+      model: parsed.model || model,
+      usage: parsed.usage || { prompt_tokens: 0, completion_tokens: 0 }
+    };
 }
 
 // Get all AI edits

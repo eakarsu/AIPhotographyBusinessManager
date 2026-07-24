@@ -6,6 +6,7 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const { validateRuntime } = require('./governance/runtime');
 const { createProviderGate } = require('./governance/providerGate');
 const governanceRouter = require('./governance/router');
+const { bootstrapRuntime } = require('./runtimeBootstrap');
 
 validateRuntime();
 
@@ -17,7 +18,7 @@ app.use(helmet());
 const allowedOrigins = String(process.env.CORS_ORIGINS || process.env.CLIENT_URL || 'http://localhost:3000').split(',').map((value) => value.trim()).filter(Boolean);
 app.use(cors({ origin: (origin, callback) => !origin || allowedOrigins.includes(origin) ? callback(null, true) : callback(new Error('Origin not allowed by CORS')), credentials: true }));
 app.use(express.json({ limit: '50mb' }));
-app.use(createProviderGate(['/api/ai', '/api/gap', '/api/cf']));
+app.use(createProviderGate(['/api/gap', '/api/cf']));
 
 const { authenticateToken } = require('./middleware/auth');
 
@@ -65,28 +66,20 @@ app.use('/api/cf-pricing-intelligence', require('./routes/customFeat04_PricingIn
 app.use('/api/cf-video-highlight-reel-generation', require('./routes/customFeat05_VideoHighlightReelGeneration'));
 
 
-// === Batch 06 Gaps & Frontend Mounts (guarded — pre-existing route bugs must not kill the app) ===
-function safeMount(mountPath, requirePath) {
-  try {
-    app.use(mountPath, require(requirePath));
-  } catch (err) {
-    console.warn(`[safeMount] Skipping ${mountPath}: ${err.message}`);
-  }
-}
-safeMount('/api/gap-shoots-without-shoot', './routes/gapFeat_shoots_without_shoot');
-safeMount('/api/gap-clients-without-client', './routes/gapFeat_clients_without_client');
-safeMount('/api/gap-galleries-without-gallery', './routes/gapFeat_galleries_without_gallery');
-safeMount('/api/gap-testimonials-without-review', './routes/gapFeat_testimonials_without_review');
-safeMount('/api/gap-limited-storage-integration-integrations-stub', './routes/gapFeat_limited_storage_integration_integrations_stub');
-safeMount('/api/gap-no-client-proofing-workflow-advanced-markup-approv', './routes/gapFeat_no_client_proofing_workflow_advanced_markup_approv');
-safeMount('/api/gap-no-photographer-schedule-optimization', './routes/gapFeat_no_photographer_schedule_optimization');
-safeMount('/api/gap-no-integration-with-lightroom-capture-one-editing-', './routes/gapFeat_no_integration_with_lightroom_capture_one_editing_');
-safeMount('/api/gap-no-marketplace-selling-prints-products', './routes/gapFeat_no_marketplace_selling_prints_products');
-safeMount('/api/gap-no-notifications-module-grep-0', './routes/gapFeat_no_notifications_module_grep_0');
-safeMount('/api/gap-no-audit-logging-grep-0', './routes/gapFeat_no_audit_logging_grep_0');
-safeMount('/api/gap-no-webhooks-for-booking-events', './routes/gapFeat_no_webhooks_for_booking_events');
+// Generated gap routes are intentionally quarantined until their contracts are validated.
+app.use(/^\/api\/gap-/, authenticateToken, (_req, res) => {
+  res.status(503).json({ error: 'GENERATED_ROUTE_QUARANTINED' });
+});
 
-app.listen(PORT, () => {
-  console.log(`\nPhotography Business Manager API running on port ${PORT}`);
-  console.log(`   Health: http://localhost:${PORT}/api/health\n`);
+async function start() {
+  await bootstrapRuntime();
+  app.listen(PORT, () => {
+    console.log(`\nPhotography Business Manager API running on port ${PORT}`);
+    console.log(`   Health: http://localhost:${PORT}/api/health\n`);
+  });
+}
+
+start().catch((error) => {
+  console.error('Failed to start Photography Business Manager:', error);
+  process.exit(1);
 });

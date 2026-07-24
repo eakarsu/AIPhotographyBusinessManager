@@ -2,11 +2,16 @@
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$PROJECT_DIR"
+require_file() { [ -f "$1" ] || { echo "Missing required file: $1" >&2; exit 1; }; }
+require_file "$PROJECT_DIR/.env"
+set -a
+source "$PROJECT_DIR/.env"
+set +a
 BACKEND_PORT="${BACKEND_PORT:-${SERVER_PORT:-3001}}"
 FRONTEND_PORT="${FRONTEND_PORT:-${CLIENT_PORT:-3000}}"
 CHILD_PIDS=()
 
-require_file() { [ -f "$1" ] || { echo "Missing required file: $1" >&2; exit 1; }; }
 require_dir() { [ -d "$1" ] || { echo "Missing dependencies: $1 (install explicitly before startup)" >&2; exit 1; }; }
 port_free() {
   if command -v lsof >/dev/null 2>&1 && lsof -ti ":$1" >/dev/null 2>&1; then
@@ -21,15 +26,14 @@ cleanup() {
 }
 trap cleanup INT TERM EXIT
 
-require_file "$PROJECT_DIR/.env"
 require_dir "$PROJECT_DIR/backend/node_modules"
 require_dir "$PROJECT_DIR/frontend/node_modules"
 port_free "$BACKEND_PORT"
 port_free "$FRONTEND_PORT"
 
-(cd "$PROJECT_DIR/backend" && BACKEND_PORT="$BACKEND_PORT" node server.js) &
+(cd "$PROJECT_DIR/backend" && exec env BACKEND_PORT="$BACKEND_PORT" node server.js) &
 CHILD_PIDS+=("$!")
-(cd "$PROJECT_DIR/frontend" && PORT="$FRONTEND_PORT" BROWSER=none npm start) &
+(cd "$PROJECT_DIR/frontend" && exec env PORT="$FRONTEND_PORT" BROWSER=none ./node_modules/.bin/react-scripts start) &
 CHILD_PIDS+=("$!")
 
 echo "Photography services started without installing, seeding, migrating, or reclaiming ports."
