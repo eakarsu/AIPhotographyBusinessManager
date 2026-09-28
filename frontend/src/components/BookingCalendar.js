@@ -80,6 +80,9 @@ export default function BookingCalendar({ token }) {
           </div>
         ))}
       </div>
+      {data.note && (
+        <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 12 }}>{data.note}</div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 6 }}>
         {dayHeaders.map(d => (

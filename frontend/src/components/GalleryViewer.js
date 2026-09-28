@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import PhotoThumb from './PhotoThumb';
 
 const API = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -24,7 +25,7 @@ export default function GalleryViewer({ token }) {
           setError(null);
         }
       })
-      .catch(err => { if (!cancelled) setError(err.message || 'load failed'); })
+      .catch(err => { if (!cancelled) setError(err.response?.data?.error || err.message || 'load failed'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [token, galleryId]);
@@ -37,9 +38,9 @@ export default function GalleryViewer({ token }) {
     <div data-testid="gallery-viewer" style={{ background: '#0f172a', borderRadius: 14, padding: 18, color: '#e2e8f0' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h3 style={{ margin: 0, color: '#f1f5f9' }}>Gallery Viewer</h3>
+          <h3 style={{ margin: 0, color: '#f1f5f9' }}>Gallery Viewer <span style={{ fontSize: 11, fontWeight: 500, color: '#fbbf24' }}>· staff-only preview</span></h3>
           <div style={{ fontSize: 13, color: '#94a3b8' }}>
-            {data.active.title} · client: {data.active.client_name || '—'} · {data.photos.length} photos · {data.favoriteCount} favorited
+            {data.active.title} · client: {data.active.client_name || '—'} · {data.photos.length} photos · {data.favoriteCount} selected
           </div>
         </div>
         <select
@@ -53,46 +54,48 @@ export default function GalleryViewer({ token }) {
         </select>
       </div>
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-        gap: 10
-      }}>
-        {data.photos.map(p => (
-          <div key={p.index} style={{
-            position: 'relative',
-            aspectRatio: '1 / 1',
-            borderRadius: 10,
-            overflow: 'hidden',
-            background: p.thumbnail,
-            boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
-            border: p.favorited ? '2px solid #fbbf24' : '2px solid transparent'
-          }}>
-            <div style={{
-              position: 'absolute', bottom: 4, left: 6,
-              fontSize: 10, color: '#fff',
-              background: 'rgba(0,0,0,0.45)', padding: '1px 6px', borderRadius: 4
-            }}>{p.label}</div>
-            {p.favorited && (
-              <div style={{
-                position: 'absolute', top: 6, right: 6,
-                background: '#fbbf24', color: '#1f2937',
-                fontSize: 11, fontWeight: 700,
-                padding: '2px 6px', borderRadius: 999
-              }}>★ Favorited</div>
-            )}
-          </div>
-        ))}
-      </div>
+      {data.notice && (
+        <div style={{ marginBottom: 12, fontSize: 12, color: '#94a3b8' }}>{data.notice}</div>
+      )}
+
+      {data.photos.length === 0 ? (
+        <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8', background: '#1e293b', borderRadius: 10 }}>
+          No uploaded photos are attached to this gallery's client shoots.
+        </div>
+      ) : (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+          gap: 10
+        }}>
+          {data.photos.map(p => (
+            <PhotoThumb
+              key={p.id}
+              photo={p}
+              token={token}
+              borderColor={p.favorited ? '#fbbf24' : 'transparent'}
+            >
+              {p.favorited && (
+                <div style={{
+                  position: 'absolute', top: 6, right: 6,
+                  background: '#fbbf24', color: '#1f2937',
+                  fontSize: 11, fontWeight: 700,
+                  padding: '2px 6px', borderRadius: 999
+                }}>★ Selected</div>
+              )}
+            </PhotoThumb>
+          ))}
+        </div>
+      )}
 
       <div style={{
         marginTop: 12, fontSize: 12, color: '#94a3b8',
         display: 'flex', gap: 16, flexWrap: 'wrap'
       }}>
         <span>Total: <strong style={{ color: '#e2e8f0' }}>{data.photos.length}</strong></span>
-        <span>★ Favorites: <strong style={{ color: '#fbbf24' }}>{data.favoriteCount}</strong></span>
+        <span>★ Selections: <strong style={{ color: '#fbbf24' }}>{data.favoriteCount}</strong></span>
         <span>Status: <strong style={{ color: '#e2e8f0' }}>{data.active.status}</strong></span>
-        <span>Submitted: <strong style={{ color: data.submitted ? '#10ac84' : '#94a3b8' }}>{String(!!data.submitted)}</strong></span>
+        <span>Studio submission: <strong style={{ color: data.submitted ? '#10ac84' : '#94a3b8' }}>{data.submitted ? 'submitted' : 'draft'}</strong></span>
       </div>
     </div>
   );

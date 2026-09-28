@@ -11,7 +11,9 @@ function callOpenRouter(messages) {
     const model = process.env.OPENROUTER_MODEL || 'anthropic/claude-3-5-sonnet-20241022';
 
     if (!apiKey || apiKey === 'your-openrouter-key-here') {
-      return resolve({ ai_response: '[Demo Mode] AI vision response', model, usage: {} });
+      const err = new Error('Photo AI provider is not configured. Set OPENROUTER_API_KEY to enable scoring and captions.');
+      err.status = 503;
+      return reject(err);
     }
 
     const body = JSON.stringify({ model, messages, max_tokens: 1500, temperature: 0.5 });
@@ -33,12 +35,16 @@ function callOpenRouter(messages) {
       res.on('end', () => {
         try {
           const parsed = JSON.parse(data);
-          if (parsed.error) resolve({ ai_response: `AI Error: ${parsed.error.message}`, model, usage: {} });
-          else resolve({ ai_response: parsed.choices[0].message.content, model: parsed.model || model, usage: parsed.usage || {} });
-        } catch (e) { resolve({ ai_response: 'Parse error', model, usage: {} }); }
+          if (parsed.error) return reject(new Error(`AI provider error: ${parsed.error.message || 'unknown'}`));
+          if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
+            return reject(new Error(`AI provider returned HTTP ${res.statusCode}`));
+          }
+          if (!parsed.choices?.[0]?.message?.content) return reject(new Error('AI provider returned no content'));
+          resolve({ ai_response: parsed.choices[0].message.content, model: parsed.model || model, usage: parsed.usage || {} });
+        } catch (e) { reject(new Error('Failed to parse AI provider response')); }
       });
     });
-    req.on('error', e => resolve({ ai_response: `Connection error: ${e.message}`, model, usage: {} }));
+    req.on('error', e => reject(new Error(`AI provider connection error: ${e.message}`)));
     req.write(body);
     req.end();
   });
@@ -137,25 +143,26 @@ Scores are 0-100. client_delivery_ready is true only if overall_score >= 70.`
 
     const aiResult = await callOpenRouter(messages);
     const parsed = parseAIJson(aiResult.ai_response);
+    if (!parsed) {
+      return res.status(502).json({ error: 'AI provider returned an unreadable scoring response; no scores were saved.' });
+    }
 
     // Update photo record with scores
-    if (parsed) {
-      await pool.query(
-        `UPDATE session_photos SET
-         composition_score=$1, lighting_score=$2, focus_score=$3, overall_score=$4,
-         client_delivery_ready=$5, ai_suggestions=$6, scored_at=NOW()
-         WHERE id=$7`,
-        [
-          parsed.composition_score || 0,
-          parsed.lighting_score || 0,
-          parsed.focus_score || 0,
-          parsed.overall_score || 0,
-          parsed.client_delivery_ready || false,
-          JSON.stringify(parsed),
-          photo.id
-        ]
-      );
-    }
+    await pool.query(
+      `UPDATE session_photos SET
+       composition_score=$1, lighting_score=$2, focus_score=$3, overall_score=$4,
+       client_delivery_ready=$5, ai_suggestions=$6, scored_at=NOW()
+       WHERE id=$7`,
+      [
+        parsed.composition_score || 0,
+        parsed.lighting_score || 0,
+        parsed.focus_score || 0,
+        parsed.overall_score || 0,
+        parsed.client_delivery_ready || false,
+        JSON.stringify(parsed),
+        photo.id
+      ]
+    );
 
     // Persist to ai_results
     try {
@@ -183,7 +190,7 @@ Scores are 0-100. client_delivery_ready is true only if overall_score >= 70.`
       model_used: aiResult.model
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 
@@ -237,23 +244,24 @@ router.post('/:id/generate-caption', aiRateLimiter, async (req, res) => {
 
     const aiResult = await callOpenRouter(messages);
     const parsed = parseAIJson(aiResult.ai_response);
+    if (!parsed) {
+      return res.status(502).json({ error: 'AI provider returned an unreadable caption response; nothing was saved.' });
+    }
 
     // Save captions to photo record
-    if (parsed) {
-      await pool.query(
-        `UPDATE session_photos SET
-         caption_instagram=$1, caption_facebook=$2, caption_linkedin=$3,
-         hashtags=$4
-         WHERE id=$5`,
-        [
-          parsed.instagram?.caption,
-          parsed.facebook?.caption,
-          parsed.linkedin?.caption,
-          parsed.instagram?.hashtags || [],
-          photo.id
-        ]
-      );
-    }
+    await pool.query(
+      `UPDATE session_photos SET
+       caption_instagram=$1, caption_facebook=$2, caption_linkedin=$3,
+       hashtags=$4
+       WHERE id=$5`,
+      [
+        parsed.instagram?.caption,
+        parsed.facebook?.caption,
+        parsed.linkedin?.caption,
+        parsed.instagram?.hashtags || [],
+        photo.id
+      ]
+    );
 
     // Persist to ai_results
     try {
@@ -274,6 +282,22 @@ router.post('/:id/generate-caption', aiRateLimiter, async (req, res) => {
       alt_text: parsed?.alt_text || '',
       model_used: aiResult.model
     });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// GET /api/photos/:id/data — stream the stored image bytes for gallery previews
+router.get('/:id/data', async (req, res) => {
+  try {
+    await ensureTables();
+    const result = await pool.query('SELECT file_name, mime_type, file_data FROM session_photos WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Photo not found' });
+    const photo = result.rows[0];
+    if (!photo.file_data) return res.status(404).json({ error: 'Photo has no stored image data' });
+    res.setHeader('Content-Type', photo.mime_type || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename="${String(photo.file_name || 'photo').replace(/"/g, '')}"`);
+    res.send(photo.file_data);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

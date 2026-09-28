@@ -28,14 +28,18 @@ export default function Dashboard({ token }) {
       axios.get(`${API}/api/testimonials`, { headers }),
       axios.get(`${API}/api/bookings`, { headers }),
     ]).then(([clients, galleries, contracts, invoices, shoots, aiEdits, social, packages, equipment, expenses, portfolio, workflows, emails, testimonials, bookings]) => {
-      const totalRevenue = invoices.data.reduce((sum, i) => sum + parseFloat(i.total || 0), 0);
-      const paidRevenue = invoices.data.filter(i => i.status === 'Paid').reduce((sum, i) => sum + parseFloat(i.total || 0), 0);
-      const totalExpenses = expenses.data.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
+      const rows = (res) => Array.isArray(res.data) ? res.data : (res.data?.data || []);
+      const invoiceRows = rows(invoices);
+      const clientRows = rows(clients);
+      const expenseRows = rows(expenses);
+      const totalRevenue = invoiceRows.reduce((sum, i) => sum + parseFloat(i.total || 0), 0);
+      const paidRevenue = invoiceRows.filter(i => i.status === 'Paid').reduce((sum, i) => sum + parseFloat(i.total || 0), 0);
+      const totalExpenses = expenseRows.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
       setStats({
-        clients: clients.data.length,
+        clients: clientRows.length,
         galleries: galleries.data.length,
         contracts: contracts.data.length,
-        invoices: invoices.data.length,
+        invoices: invoiceRows.length,
         shoots: shoots.data.length,
         aiEdits: aiEdits.data.length,
         social: social.data.length,

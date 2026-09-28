@@ -1,10 +1,12 @@
 // Custom Views routes (Studio Views) — 4 endpoints supporting:
-//  - VIZ1 BookingCalendar (monthly bookings grouped by photographer/shoot_type)
-//  - VIZ2 GalleryViewer  (synthetic photos per gallery with thumbnail + favorited)
+//  - VIZ1 BookingCalendar (monthly bookings grouped by date; no assignment data
+//    exists on bookings/shoots, so every event is shown as "Unassigned")
+//  - VIZ2 GalleryViewer  (real uploaded session photos for the gallery's client)
 //  - NV1  InvoicePDF     (client+session picker -> generated PDF)
-//  - NV2  PhotoSelectionWorkflow (records favorited photo selections and reads state)
+//  - NV2  PhotoSelectionWorkflow (staff selections persisted in Postgres)
 //
-// All endpoints require the existing auth middleware.
+// All endpoints require the existing auth middleware. There is no client-facing
+// gallery/proofing portal; selections are staff-only and labelled as such.
 
 const express = require('express');
 const pool = require('../db');
@@ -14,39 +16,87 @@ try { PDFDocument = require('pdfkit'); } catch (e) { PDFDocument = null; }
 
 const router = express.Router();
 
-// In-memory favorites store keyed by gallery_id -> Set(photo_index).
-// (No schema changes required; survives within a single backend process.)
-const favoritesStore = new Map(); // key: gallery_id -> { selections: Map(photo_index -> true), submitted: bool }
+const UNASSIGNED = { name: 'Unassigned', color: '#64748b' };
 
-function deterministicSeed(seedStr) {
-  let h = 0;
-  for (let i = 0; i < seedStr.length; i++) {
-    h = ((h << 5) - h) + seedStr.charCodeAt(i);
-    h |= 0;
-  }
-  return Math.abs(h);
+async function ensureSelectionTables() {
+  // session_photos is also created lazily by the sessions/photos routes; make
+  // sure gallery reads work even if no upload has happened in this database.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS session_photos (
+      id SERIAL PRIMARY KEY,
+      session_id INTEGER,
+      shoot_id INTEGER,
+      file_name VARCHAR(255),
+      file_size INTEGER,
+      mime_type VARCHAR(100),
+      file_data BYTEA,
+      composition_score INTEGER DEFAULT 0,
+      lighting_score INTEGER DEFAULT 0,
+      focus_score INTEGER DEFAULT 0,
+      overall_score INTEGER DEFAULT 0,
+      client_delivery_ready BOOLEAN DEFAULT FALSE,
+      ai_suggestions JSONB,
+      caption_instagram TEXT,
+      caption_facebook TEXT,
+      caption_linkedin TEXT,
+      hashtags TEXT[],
+      scored_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS gallery_photo_selections (
+      id SERIAL PRIMARY KEY,
+      gallery_id INTEGER NOT NULL,
+      photo_id INTEGER NOT NULL,
+      selected_by INTEGER,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE (gallery_id, photo_id)
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS gallery_selection_state (
+      gallery_id INTEGER PRIMARY KEY,
+      submitted BOOLEAN NOT NULL DEFAULT FALSE,
+      submitted_by INTEGER,
+      submitted_at TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
 }
 
-function pseudoRandom(seed, idx) {
-  const x = Math.sin((seed + idx) * 9301 + 49297) * 233280;
-  return x - Math.floor(x);
+// Real photos attached to a gallery: session_photos uploaded against shoots
+// belonging to the gallery's client.
+async function loadGalleryPhotos(gallery) {
+  const r = await pool.query(
+    `SELECT sp.id, sp.file_name, sp.created_at,
+            sh.title AS shoot_title, sh.shoot_date
+       FROM session_photos sp
+       JOIN shoots sh ON sh.id = sp.session_id
+      WHERE sh.client_id = $1
+      ORDER BY sp.created_at ASC, sp.id ASC
+      LIMIT 200`,
+    [gallery.client_id]
+  );
+  return r.rows;
 }
 
-function gradientForPhoto(seed, idx) {
-  const palette = [
-    ['#ff6b9d', '#feca57'], ['#48dbfb', '#0abde3'], ['#1dd1a1', '#10ac84'],
-    ['#5f27cd', '#341f97'], ['#ff9ff3', '#f368e0'], ['#ee5253', '#c8d6e5'],
-    ['#feca57', '#ff9f43'], ['#54a0ff', '#2e86de'], ['#00d2d3', '#01a3a4'],
-    ['#ff6348', '#ff7f50'], ['#a29bfe', '#6c5ce7'], ['#fd79a8', '#e84393']
-  ];
-  const pair = palette[(seed + idx) % palette.length];
-  const angle = Math.floor(pseudoRandom(seed, idx) * 360);
-  return `linear-gradient(${angle}deg, ${pair[0]}, ${pair[1]})`;
+async function loadSelectionState(galleryId) {
+  const [selections, state] = await Promise.all([
+    pool.query('SELECT photo_id FROM gallery_photo_selections WHERE gallery_id = $1', [galleryId]),
+    pool.query('SELECT submitted, submitted_at FROM gallery_selection_state WHERE gallery_id = $1', [galleryId]),
+  ]);
+  const photoIds = selections.rows.map(row => row.photo_id);
+  const submitted = state.rows.length > 0 && state.rows[0].submitted === true;
+  return { photoIds, submitted, submittedAt: state.rows[0]?.submitted_at || null };
 }
 
 // ---------------------------------------------------------------------------
 // VIZ 1 — Booking Calendar:  GET /api/custom-views/booking-calendar?month=YYYY-MM
-// Returns month grid with bookings grouped by date plus per-photographer color.
+// Returns month grid with bookings grouped by date. Bookings and shoots have no
+// photographer column, so events are returned as "Unassigned" rather than with
+// invented names.
 // ---------------------------------------------------------------------------
 router.get('/booking-calendar', authenticateToken, async (req, res) => {
   try {
@@ -85,15 +135,6 @@ router.get('/booking-calendar', authenticateToken, async (req, res) => {
       [startDate.toISOString().slice(0, 10), endDate.toISOString().slice(0, 10)]
     );
 
-    // Build a quick photographer mapping using a deterministic assignment.
-    // (Backend has no `photographer` column; we synthesize from shoot_type.)
-    const photographers = [
-      { name: 'Alex Rivera',     color: '#5f27cd' },
-      { name: 'Jordan Park',     color: '#0abde3' },
-      { name: 'Riley Chen',      color: '#10ac84' },
-      { name: 'Casey Morales',   color: '#ee5253' },
-      { name: 'Sam Patel',       color: '#feca57' }
-    ];
     const statusColors = {
       'New':       '#94a3b8',
       'Contacted': '#0abde3',
@@ -103,14 +144,8 @@ router.get('/booking-calendar', authenticateToken, async (req, res) => {
       'Cancelled': '#ee5253'
     };
 
-    const assignPhotographer = (key) => {
-      const seed = deterministicSeed(String(key || 'x'));
-      return photographers[seed % photographers.length];
-    };
-
     const events = [];
     for (const b of bookingsRes.rows) {
-      const photog = assignPhotographer(b.shoot_type + '|' + b.id);
       events.push({
         id: `booking-${b.id}`,
         kind: 'booking',
@@ -122,12 +157,12 @@ router.get('/booking-calendar', authenticateToken, async (req, res) => {
         location: b.location,
         status: b.status,
         statusColor: statusColors[b.status] || '#94a3b8',
-        photographer: photog.name,
-        photographerColor: photog.color
+        photographer: UNASSIGNED.name,
+        photographerColor: UNASSIGNED.color,
+        assignmentNote: 'No photographer assignment is recorded for bookings.'
       });
     }
     for (const s of shootsRes.rows) {
-      const photog = assignPhotographer(s.shoot_type + '|' + s.id);
       events.push({
         id: `shoot-${s.id}`,
         kind: 'shoot',
@@ -139,8 +174,9 @@ router.get('/booking-calendar', authenticateToken, async (req, res) => {
         location: s.location,
         status: s.status,
         statusColor: statusColors[s.status] || '#5f27cd',
-        photographer: photog.name,
-        photographerColor: photog.color
+        photographer: UNASSIGNED.name,
+        photographerColor: UNASSIGNED.color,
+        assignmentNote: 'No photographer assignment column exists on shoots.'
       });
     }
 
@@ -148,14 +184,16 @@ router.get('/booking-calendar', authenticateToken, async (req, res) => {
       year, month,
       daysInMonth: endDate.getUTCDate(),
       firstWeekday: new Date(Date.UTC(year, month - 1, 1)).getUTCDay(),
-      photographers,
+      photographers: [UNASSIGNED],
+      assignmentTracked: false,
       statusColors,
       events,
       counts: {
         bookings: bookingsRes.rows.length,
         shoots: shootsRes.rows.length,
         total: events.length
-      }
+      },
+      note: 'Photographer assignment is not tracked in this schema; every event is shown as Unassigned.'
     });
   } catch (err) {
     console.error('booking-calendar error', err);
@@ -165,13 +203,13 @@ router.get('/booking-calendar', authenticateToken, async (req, res) => {
 
 // ---------------------------------------------------------------------------
 // VIZ 2 — Gallery Viewer:  GET /api/custom-views/gallery-viewer?gallery_id=ID
-// Returns the gallery's photo set (synthetic from photo_count) and current
-// favorited state from PhotoSelectionWorkflow.
+// Returns the gallery's real uploaded photos (none fabricated) plus the current
+// staff selection state.
 // ---------------------------------------------------------------------------
 router.get('/gallery-viewer', authenticateToken, async (req, res) => {
   try {
     const galleriesRes = await pool.query(
-      `SELECT g.id, g.title, g.description, g.photo_count, g.status,
+      `SELECT g.id, g.title, g.description, g.photo_count, g.status, g.client_id,
               g.delivery_date, g.cover_image_url, c.name AS client_name
          FROM galleries g
          LEFT JOIN clients c ON c.id = g.client_id
@@ -185,25 +223,23 @@ router.get('/gallery-viewer', authenticateToken, async (req, res) => {
       : galleries[0];
 
     if (!active) {
-      return res.json({ galleries: [], active: null, photos: [], favoriteCount: 0 });
+      return res.json({ galleries: [], active: null, photos: [], favoriteCount: 0, submitted: false });
     }
 
-    const seed = deterministicSeed(`${active.id}:${active.title}`);
-    const photoCount = Math.min(Math.max(active.photo_count || 24, 12), 48);
-    const fav = favoritesStore.get(active.id) || { selections: new Map(), submitted: false };
+    await ensureSelectionTables();
+    const [photoRows, selection] = await Promise.all([
+      loadGalleryPhotos(active),
+      loadSelectionState(active.id),
+    ]);
+    const selected = new Set(selection.photoIds);
 
-    const photos = [];
-    for (let i = 0; i < photoCount; i++) {
-      const isFav = fav.selections.has(i);
-      photos.push({
-        index: i,
-        label: `${String(active.id).padStart(2, '0')}-${String(i + 1).padStart(3, '0')}`,
-        thumbnail: gradientForPhoto(seed, i),
-        favorited: isFav,
-        width: 1 + Math.floor(pseudoRandom(seed, i * 3) * 1.6),
-        height: 1 + Math.floor(pseudoRandom(seed, i * 5) * 1.6)
-      });
-    }
+    const photos = photoRows.map(p => ({
+      id: p.id,
+      label: p.file_name || `photo-${p.id}`,
+      shootTitle: p.shoot_title,
+      thumbnailUrl: `/api/photos/${p.id}/data`,
+      favorited: selected.has(p.id),
+    }));
 
     res.json({
       galleries: galleries.map(g => ({
@@ -224,7 +260,10 @@ router.get('/gallery-viewer', authenticateToken, async (req, res) => {
       },
       photos,
       favoriteCount: photos.filter(p => p.favorited).length,
-      submitted: fav.submitted === true
+      submitted: selection.submitted,
+      notice: photos.length === 0
+        ? 'No uploaded photos are linked to this gallery\'s client shoots yet.'
+        : 'Staff-only preview of uploaded photos. No client-facing gallery portal is provided.',
     });
   } catch (err) {
     console.error('gallery-viewer error', err);
@@ -389,14 +428,15 @@ router.post('/invoice-pdf', authenticateToken, async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// NON-VIZ 2 — Photo Selection Workflow:
+// NON-VIZ 2 — Photo Selection Workflow (staff only, persisted):
 //   GET  /api/custom-views/photo-selection?gallery_id=ID
-//   POST /api/custom-views/photo-selection  { gallery_id, selections, submit }
+//   POST /api/custom-views/photo-selection  { gallery_id, photo_ids, submit }
 // ---------------------------------------------------------------------------
 router.get('/photo-selection', authenticateToken, async (req, res) => {
   try {
+    await ensureSelectionTables();
     const galleriesRes = await pool.query(
-      `SELECT g.id, g.title, g.photo_count, g.status, c.name AS client_name
+      `SELECT g.id, g.title, g.photo_count, g.status, g.client_id, c.name AS client_name
          FROM galleries g
          LEFT JOIN clients c ON c.id = g.client_id
         ORDER BY g.id ASC`
@@ -410,19 +450,19 @@ router.get('/photo-selection', authenticateToken, async (req, res) => {
       return res.json({ galleries: [], active: null, photos: [], selections: [], submitted: false });
     }
 
-    const seed = deterministicSeed(`${active.id}:${active.title}`);
-    const photoCount = Math.min(Math.max(active.photo_count || 24, 12), 48);
-    const state = favoritesStore.get(active.id) || { selections: new Map(), submitted: false };
+    const [photoRows, selection] = await Promise.all([
+      loadGalleryPhotos(active),
+      loadSelectionState(active.id),
+    ]);
+    const selected = new Set(selection.photoIds);
 
-    const photos = [];
-    for (let i = 0; i < photoCount; i++) {
-      photos.push({
-        index: i,
-        label: `${String(active.id).padStart(2, '0')}-${String(i + 1).padStart(3, '0')}`,
-        thumbnail: gradientForPhoto(seed, i),
-        favorited: state.selections.has(i)
-      });
-    }
+    const photos = photoRows.map(p => ({
+      id: p.id,
+      label: p.file_name || `photo-${p.id}`,
+      shootTitle: p.shoot_title,
+      thumbnailUrl: `/api/photos/${p.id}/data`,
+      favorited: selected.has(p.id),
+    }));
 
     res.json({
       galleries: galleries.map(g => ({
@@ -433,11 +473,12 @@ router.get('/photo-selection', authenticateToken, async (req, res) => {
         status: active.status, client_name: active.client_name
       },
       photos,
-      selections: Array.from(state.selections.keys()),
-      submitted: state.submitted === true,
-      clientVisibleState: state.submitted
-        ? `Client sees ${state.selections.size} favorited photo(s) — selection submitted.`
-        : 'Selection not yet submitted; client sees draft state only.'
+      selections: Array.from(selected),
+      submitted: selection.submitted,
+      submittedAt: selection.submittedAt,
+      notice: photos.length === 0
+        ? 'No uploaded photos are linked to this gallery\'s client shoots yet.'
+        : 'Staff-only proofing. Selections are saved to the studio database and are not exposed to clients.',
     });
   } catch (err) {
     console.error('photo-selection GET error', err);
@@ -447,30 +488,84 @@ router.get('/photo-selection', authenticateToken, async (req, res) => {
 
 router.post('/photo-selection', authenticateToken, async (req, res) => {
   try {
-    const { gallery_id, selections, submit } = req.body || {};
+    await ensureSelectionTables();
+    const { gallery_id, photo_ids, selections, submit } = req.body || {};
     if (!gallery_id) return res.status(400).json({ error: 'gallery_id is required' });
     const gid = parseInt(gallery_id, 10);
+    if (!Number.isInteger(gid)) return res.status(400).json({ error: 'gallery_id must be an integer' });
 
-    const existing = favoritesStore.get(gid) || { selections: new Map(), submitted: false };
-    if (Array.isArray(selections)) {
-      existing.selections = new Map();
-      for (const s of selections) {
-        const idx = parseInt(s, 10);
-        if (!Number.isNaN(idx)) existing.selections.set(idx, true);
+    const rawIds = Array.isArray(photo_ids) ? photo_ids : selections;
+    if (!Array.isArray(rawIds)) return res.status(400).json({ error: 'photo_ids must be an array' });
+    const ids = [...new Set(rawIds.map(v => parseInt(v, 10)).filter(v => Number.isInteger(v) && v > 0))];
+
+    const galleryRes = await pool.query('SELECT id, client_id, title FROM galleries WHERE id = $1', [gid]);
+    if (galleryRes.rows.length === 0) return res.status(404).json({ error: 'Gallery not found' });
+    const gallery = galleryRes.rows[0];
+
+    // Selections must reference photos that actually belong to this gallery's
+    // client, so a caller cannot write cross-client selections.
+    if (ids.length > 0) {
+      const validRes = await pool.query(
+        `SELECT sp.id
+           FROM session_photos sp
+           JOIN shoots sh ON sh.id = sp.session_id
+          WHERE sh.client_id = $1 AND sp.id = ANY($2::int[])`,
+        [gallery.client_id, ids]
+      );
+      const validIds = new Set(validRes.rows.map(r => r.id));
+      const invalid = ids.filter(id => !validIds.has(id));
+      if (invalid.length > 0) {
+        return res.status(400).json({ error: `These photos are not part of this gallery's client shoot set: ${invalid.join(', ')}` });
       }
     }
-    if (typeof submit === 'boolean') existing.submitted = submit;
-    favoritesStore.set(gid, existing);
+
+    const submitted = submit === true;
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      if (ids.length === 0) {
+        await client.query('DELETE FROM gallery_photo_selections WHERE gallery_id = $1', [gid]);
+      } else {
+        await client.query(
+          'DELETE FROM gallery_photo_selections WHERE gallery_id = $1 AND NOT (photo_id = ANY($2::int[]))',
+          [gid, ids]
+        );
+        await client.query(
+          `INSERT INTO gallery_photo_selections (gallery_id, photo_id, selected_by, updated_at)
+           SELECT $1, unnest($2::int[]), $3, NOW()
+           ON CONFLICT (gallery_id, photo_id)
+           DO UPDATE SET selected_by = EXCLUDED.selected_by, updated_at = NOW()`,
+          [gid, ids, req.user?.id || null]
+        );
+      }
+      await client.query(
+        `INSERT INTO gallery_selection_state (gallery_id, submitted, submitted_by, submitted_at, updated_at)
+         VALUES ($1, $2, $3, CASE WHEN $2 THEN NOW() ELSE NULL END, NOW())
+         ON CONFLICT (gallery_id)
+         DO UPDATE SET submitted = EXCLUDED.submitted,
+                       submitted_by = EXCLUDED.submitted_by,
+                       submitted_at = EXCLUDED.submitted_at,
+                       updated_at = NOW()`,
+        [gid, submitted, req.user?.id || null]
+      );
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
 
     res.json({
       ok: true,
       gallery_id: gid,
-      favorited_count: existing.selections.size,
-      selections: Array.from(existing.selections.keys()),
-      submitted: existing.submitted,
-      clientVisibleState: existing.submitted
-        ? `Client sees ${existing.selections.size} favorited photo(s) — selection submitted.`
-        : 'Selection saved as draft; client does not see favorites yet.'
+      gallery_title: gallery.title,
+      favorited_count: ids.length,
+      photo_ids: ids,
+      submitted,
+      message: submitted
+        ? `Selection submitted for studio review (${ids.length} photos). Staff-only — no client-facing portal is provided.`
+        : `Selection saved as a staff draft (${ids.length} photos).`,
     });
   } catch (err) {
     console.error('photo-selection POST error', err);

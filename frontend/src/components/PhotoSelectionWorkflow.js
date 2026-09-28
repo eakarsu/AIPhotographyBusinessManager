@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import PhotoThumb from './PhotoThumb';
 
 const API = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -25,15 +26,15 @@ export default function PhotoSelectionWorkflow({ token }) {
         setSelections(new Set(res.data.selections || []));
         setError(null);
       })
-      .catch(err => setError(err.message || 'load failed'))
+      .catch(err => setError(err.response?.data?.error || err.message || 'load failed'))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => { fetchState(galleryId); /* eslint-disable-next-line */ }, [token, galleryId]);
 
-  const toggle = (idx) => {
+  const toggle = (id) => {
     const next = new Set(selections);
-    if (next.has(idx)) next.delete(idx); else next.add(idx);
+    if (next.has(id)) next.delete(id); else next.add(id);
     setSelections(next);
   };
 
@@ -45,15 +46,15 @@ export default function PhotoSelectionWorkflow({ token }) {
         `${API}/api/custom-views/photo-selection`,
         {
           gallery_id: galleryId,
-          selections: Array.from(selections),
+          photo_ids: Array.from(selections),
           submit
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setStatusMsg(res.data.clientVisibleState);
+      setStatusMsg(res.data.message);
       await fetchState(galleryId);
     } catch (e) {
-      setError(e.message || 'save failed');
+      setError(e.response?.data?.error || e.message || 'save failed');
     } finally {
       setSaving(false);
     }
@@ -67,7 +68,9 @@ export default function PhotoSelectionWorkflow({ token }) {
     <div data-testid="photo-selection-workflow" style={{ background: '#0f172a', borderRadius: 14, padding: 18, color: '#e2e8f0' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, alignItems: 'center', marginBottom: 12 }}>
         <div>
-          <h3 style={{ margin: 0, color: '#f1f5f9' }}>Photo Selection Workflow</h3>
+          <h3 style={{ margin: 0, color: '#f1f5f9' }}>
+            Photo Selection Workflow <span style={{ fontSize: 11, fontWeight: 500, color: '#fbbf24' }}>· staff-only</span>
+          </h3>
           <div style={{ fontSize: 13, color: '#94a3b8' }}>
             {data.active.title} · {selections.size}/{data.photos.length} selected
           </div>
@@ -79,50 +82,46 @@ export default function PhotoSelectionWorkflow({ token }) {
         </select>
       </div>
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
-        gap: 10
-      }}>
-        {data.photos.map(p => {
-          const checked = selections.has(p.index);
-          return (
-            <label key={p.index} style={{
-              position: 'relative',
-              aspectRatio: '1 / 1',
-              borderRadius: 10,
-              overflow: 'hidden',
-              background: p.thumbnail,
-              cursor: 'pointer',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
-              border: checked ? '2px solid #fbbf24' : '2px solid transparent'
-            }}>
-              <input
-                type="checkbox"
-                checked={checked}
-                onChange={() => toggle(p.index)}
-                aria-label={`Select photo ${p.label}`}
-                style={{
-                  position: 'absolute', top: 6, left: 6, width: 18, height: 18, accentColor: '#fbbf24'
-                }}
-              />
-              <div style={{
-                position: 'absolute', bottom: 4, left: 6,
-                fontSize: 10, color: '#fff',
-                background: 'rgba(0,0,0,0.45)', padding: '1px 6px', borderRadius: 4
-              }}>{p.label}</div>
-              {checked && (
-                <div style={{
-                  position: 'absolute', top: 6, right: 6,
-                  background: '#fbbf24', color: '#1f2937',
-                  fontSize: 10, fontWeight: 700,
-                  padding: '1px 6px', borderRadius: 999
-                }}>★</div>
-              )}
-            </label>
-          );
-        })}
-      </div>
+      {data.notice && (
+        <div style={{ marginBottom: 12, fontSize: 12, color: '#94a3b8' }}>{data.notice}</div>
+      )}
+
+      {data.photos.length === 0 ? (
+        <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8', background: '#1e293b', borderRadius: 10 }}>
+          No uploaded photos are attached to this gallery's client shoots.
+        </div>
+      ) : (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+          gap: 10
+        }}>
+          {data.photos.map(p => {
+            const checked = selections.has(p.id);
+            return (
+              <label key={p.id} style={{ cursor: 'pointer' }}>
+                <PhotoThumb photo={p} token={token} borderColor={checked ? '#fbbf24' : 'transparent'}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggle(p.id)}
+                    aria-label={`Select photo ${p.label}`}
+                    style={{ position: 'absolute', top: 6, left: 6, width: 18, height: 18, accentColor: '#fbbf24' }}
+                  />
+                  {checked && (
+                    <div style={{
+                      position: 'absolute', top: 6, right: 6,
+                      background: '#fbbf24', color: '#1f2937',
+                      fontSize: 10, fontWeight: 700,
+                      padding: '1px 6px', borderRadius: 999
+                    }}>★</div>
+                  )}
+                </PhotoThumb>
+              </label>
+            );
+          })}
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap', alignItems: 'center' }}>
         <button onClick={() => save(false)} disabled={saving} style={btnSecondary}>
@@ -135,7 +134,7 @@ export default function PhotoSelectionWorkflow({ token }) {
           marginLeft: 'auto', fontSize: 12,
           color: data.submitted ? '#10ac84' : '#94a3b8'
         }}>
-          Client view: <strong>{data.submitted ? 'submitted' : 'draft only'}</strong>
+          Studio submission: <strong>{data.submitted ? 'submitted' : 'draft'}</strong>
         </div>
       </div>
 

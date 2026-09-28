@@ -25,8 +25,9 @@ export default function Invoices({ token }) {
         axios.get(`${API}/api/invoices`, { headers }),
         axios.get(`${API}/api/clients`, { headers })
       ]);
-      setItems(iRes.data);
-      setClients(cRes.data);
+      // Both endpoints return paginated envelopes ({ data, page, ... }).
+      setItems(iRes.data.data || []);
+      setClients(cRes.data.data || []);
     } catch (err) { toast.error('Failed to load invoices'); }
     finally { setLoading(false); }
   };
