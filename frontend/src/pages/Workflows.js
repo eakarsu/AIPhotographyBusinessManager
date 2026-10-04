@@ -3,7 +3,7 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API = process.env.REACT_APP_API_URL || '';
 
 const emptyWorkflow = { title: '', client_id: '', workflow_type: 'Standard', current_step: 1, due_date: '', priority: 'Medium', status: 'In Progress', notes: '' };
 

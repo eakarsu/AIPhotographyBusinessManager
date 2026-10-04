@@ -3,7 +3,7 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API = process.env.REACT_APP_API_URL || '';
 
 const emptyForm = { client_id: '', rating: 5, review_text: '', shoot_type: '', is_featured: false, source: 'Website', status: 'Published' };
 

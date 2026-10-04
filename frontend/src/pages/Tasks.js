@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API = process.env.REACT_APP_API_URL || '';
 
 export default function Tasks({ token }) {
   const [result, setResult] = useState(null);

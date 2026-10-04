@@ -4,7 +4,7 @@ import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
 import AIOutput from '../components/AIOutput';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API = process.env.REACT_APP_API_URL || '';
 
 const emptyContract = { title: '', client_id: '', contract_type: 'Standard', content: '', amount: 0, status: 'Draft', valid_until: '' };
 

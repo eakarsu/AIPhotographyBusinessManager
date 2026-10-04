@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API = process.env.REACT_APP_API_URL || '';
 
 export default function Login({ onLogin }) {
   const [email, setEmail] = useState('');
@@ -60,8 +60,8 @@ export default function Login({ onLogin }) {
           <button type="submit" className="btn btn-primary btn-full" disabled={loading}>
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
-          <button type="button" className="btn btn-auto-fill btn-full" onClick={handleAutoFill}>
-            ⚡ Auto Fill Demo Credentials
+          <button type="button" className="btn btn-auto-fill btn-full" onClick={async (event) => { await (handleAutoFill)(event); window.setTimeout(() => { const form = document.querySelector("form"); if (form) form.requestSubmit(); }, 150); }}>
+            ⚡ Log In as Demo
           </button>
         </form>
       </div>

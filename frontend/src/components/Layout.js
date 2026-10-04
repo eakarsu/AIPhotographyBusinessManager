@@ -5,6 +5,7 @@ const navItems = [
   { path: '/', label: 'Dashboard', icon: '📊' },
   { path: '/clients', label: 'Clients', icon: '👥' },
   { path: '/galleries', label: 'Galleries', icon: '🖼️' },
+  { path: '/governed-releases', label: 'Governed Releases', icon: '🔒' },
   { path: '/contracts', label: 'Contracts', icon: '📋' },
   { path: '/invoices', label: 'Invoices', icon: '💰' },
   { path: '/shoots', label: 'Shoots', icon: '📅' },

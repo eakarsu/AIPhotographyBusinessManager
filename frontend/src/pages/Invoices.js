@@ -3,7 +3,7 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API = process.env.REACT_APP_API_URL || '';
 
 const emptyInvoice = { invoice_number: '', client_id: '', items: [], subtotal: 0, tax_rate: 8.25, tax_amount: 0, total: 0, status: 'Draft', due_date: '', notes: '' };
 

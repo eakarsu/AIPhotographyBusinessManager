@@ -3,7 +3,7 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API = process.env.REACT_APP_API_URL || '';
 
 const emptyGallery = { title: '', client_id: '', description: '', photo_count: 0, status: 'Draft', delivery_date: '', access_password: '' };
 

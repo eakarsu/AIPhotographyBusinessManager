@@ -1,3 +1,6 @@
-const express=require('express');const pool=require('../db');const {authenticateToken}=require('../middleware/auth');const {createWorkflow}=require('./workflowCore');const {createGovernedRouter}=require('./routerFactory');
+const express=require('express');const pool=require('../db');const multer=require('multer');const {authenticateToken}=require('../middleware/auth');const {createWorkflow}=require('./workflowCore');const {createGovernedRouter}=require('./routerFactory');
+const {createStaffGalleryRouter}=require('./localGalleryRouter');
 const db={query:async(s,p)=>(await pool.query(s,p)).rows,transaction:async work=>{const c=await pool.connect();try{await c.query('BEGIN');const result=await work(async(s,p)=>(await c.query(s,p)).rows);await c.query('COMMIT');return result;}catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}}};
-module.exports=createGovernedRouter({express,workflow:createWorkflow(require('./config')),auth:authenticateToken,db});
+const router=createGovernedRouter({express,workflow:createWorkflow(require('./config')),auth:authenticateToken,db});
+router.use(createStaffGalleryRouter({express,db,multer}));
+module.exports=router;

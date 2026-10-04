@@ -3,7 +3,7 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API = process.env.REACT_APP_API_URL || '';
 
 const emptyPortfolio = { title: '', category: 'Portrait', description: '', camera_settings: '', location: '', shoot_date: '', is_featured: false, display_order: 0, status: 'Published' };
 

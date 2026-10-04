@@ -71,6 +71,7 @@ async function ensureSelectionTables() {
 async function loadGalleryPhotos(gallery) {
   const r = await pool.query(
     `SELECT sp.id, sp.file_name, sp.created_at,
+            sp.focus_score, sp.overall_score, sp.scored_at,
             sh.title AS shoot_title, sh.shoot_date
        FROM session_photos sp
        JOIN shoots sh ON sh.id = sp.session_id
@@ -239,6 +240,9 @@ router.get('/gallery-viewer', authenticateToken, async (req, res) => {
       shootTitle: p.shoot_title,
       thumbnailUrl: `/api/photos/${p.id}/data`,
       favorited: selected.has(p.id),
+      focusScore: p.scored_at ? Number(p.focus_score) : null,
+      overallScore: p.scored_at ? Number(p.overall_score) : null,
+      scoredAt: p.scored_at || null,
     }));
 
     res.json({
@@ -462,6 +466,9 @@ router.get('/photo-selection', authenticateToken, async (req, res) => {
       shootTitle: p.shoot_title,
       thumbnailUrl: `/api/photos/${p.id}/data`,
       favorited: selected.has(p.id),
+      focusScore: p.scored_at ? Number(p.focus_score) : null,
+      overallScore: p.scored_at ? Number(p.overall_score) : null,
+      scoredAt: p.scored_at || null,
     }));
 
     res.json({

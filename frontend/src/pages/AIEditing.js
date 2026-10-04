@@ -4,7 +4,7 @@ import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
 import AIOutput from '../components/AIOutput';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API = process.env.REACT_APP_API_URL || '';
 
 const emptyEdit = { photo_name: '', edit_type: 'Auto-Enhance', original_settings: {}, status: 'Pending' };
 

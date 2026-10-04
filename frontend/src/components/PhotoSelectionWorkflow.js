@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import PhotoThumb from './PhotoThumb';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API = process.env.REACT_APP_API_URL || '';
 
 export default function PhotoSelectionWorkflow({ token }) {
   const [data, setData] = useState(null);
@@ -64,6 +64,19 @@ export default function PhotoSelectionWorkflow({ token }) {
   if (error)   return <div style={{ padding: 24, color: '#fca5a5' }}>Error: {error}</div>;
   if (!data || !data.active) return <div style={{ padding: 24, color: '#cbd5e1' }}>No galleries available.</div>;
 
+  const scored = data.photos.filter(p => Number.isFinite(p.overallScore) && Number.isFinite(p.focusScore));
+  const candidates = [...scored]
+    .filter(p => p.overallScore >= 70 && p.focusScore >= 70)
+    .sort((a, b) => b.overallScore - a.overallScore || b.focusScore - a.focusScore)
+    .slice(0, 12);
+  const focusWarnings = scored.filter(p => p.focusScore < 60);
+  const filenameCounts = data.photos.reduce((counts, p) => {
+    const key = String(p.label || '').trim().toLowerCase();
+    if (key) counts[key] = (counts[key] || 0) + 1;
+    return counts;
+  }, {});
+  const sameName = data.photos.filter(p => filenameCounts[String(p.label || '').trim().toLowerCase()] > 1);
+
   return (
     <div data-testid="photo-selection-workflow" style={{ background: '#0f172a', borderRadius: 14, padding: 18, color: '#e2e8f0' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, alignItems: 'center', marginBottom: 12 }}>
@@ -85,6 +98,19 @@ export default function PhotoSelectionWorkflow({ token }) {
       {data.notice && (
         <div style={{ marginBottom: 12, fontSize: 12, color: '#94a3b8' }}>{data.notice}</div>
       )}
+      <div style={{ marginBottom: 14, padding: 12, background: '#1e293b', borderRadius: 8 }}>
+        <strong>Proof set suggestions from uploaded photos</strong>
+        <p style={{ margin: '6px 0', fontSize: 12, color: '#cbd5e1' }}>
+          Existing AI scores cover {scored.length} of {data.photos.length} photos. Suggested picks require overall and focus scores of at least 70.
+          The photographer controls every selection; verify image quality, rights and consent before sharing.
+        </p>
+        {candidates.length > 0 && <>
+          <p style={{ margin: '4px 0', fontSize: 12 }}>Candidates: {candidates.map(p => `${p.label} (overall ${p.overallScore}, focus ${p.focusScore})`).join('; ')}</p>
+          <button type="button" onClick={() => setSelections(new Set(candidates.map(p => p.id)))} style={btnSecondary}>Use suggestions as draft</button>
+        </>}
+        {focusWarnings.length > 0 && <p style={{ margin: '4px 0', fontSize: 12, color: '#fbbf24' }}>Review possible focus issues: {focusWarnings.map(p => `${p.label} (${p.focusScore})`).join('; ')}</p>}
+        {sameName.length > 0 && <p style={{ margin: '4px 0', fontSize: 12, color: '#fbbf24' }}>Repeated filenames; inspect for duplicates: {sameName.map(p => p.label).join('; ')}. Matching names do not prove duplicate content.</p>}
+      </div>
 
       {data.photos.length === 0 ? (
         <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8', background: '#1e293b', borderRadius: 10 }}>

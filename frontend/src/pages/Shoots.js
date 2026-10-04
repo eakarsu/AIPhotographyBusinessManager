@@ -3,7 +3,7 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API = process.env.REACT_APP_API_URL || '';
 
 const emptyShoot = { title: '', client_id: '', shoot_date: '', start_time: '', end_time: '', location: '', shoot_type: 'Portrait', status: 'Scheduled', notes: '', package_name: '', price: 0 };
 

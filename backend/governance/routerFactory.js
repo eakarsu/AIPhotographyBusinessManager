@@ -232,6 +232,9 @@ function createGovernedRouter({ express, workflow, auth, db }) {
 
   router.post('/cases/:id/transitions', async (req, res) => {
     try {
+      if (new Set(['queue_render', 'record_render', 'record_render_failure', 'retry_render', 'record_publish', 'record_export']).has(req.body?.action)) {
+        return res.status(503).json({ error: 'CONNECTOR_UNCONFIGURED', message: 'Render, publish, and export transitions require configured provider receipts.' });
+      }
       const ctx = workflow.context(req.headers, req.user);
       const requestHash = crypto.createHash('sha256').update(canonical({ operation: 'transitions', body: req.body || {}, actor: ctx.actorId, role: ctx.role })).digest('hex');
       const result = await db.transaction(async (query) => {
@@ -365,4 +368,3 @@ function createGovernedRouter({ express, workflow, auth, db }) {
 }
 
 module.exports = { createGovernedRouter };
-

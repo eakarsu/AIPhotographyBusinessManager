@@ -24,6 +24,7 @@ const { authenticateToken } = require('./middleware/auth');
 
 // Public routes
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/client-gallery', require('./governance/clientGalleryRouter'));
 
 // Protected routes
 app.use('/api/clients', authenticateToken, require('./routes/clients'));

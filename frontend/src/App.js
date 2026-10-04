@@ -25,6 +25,8 @@ import Tasks from './pages/Tasks';
 import ShootPlanOptimize from './pages/ShootPlanOptimize';
 import GalleryOrganizationAI from './pages/GalleryOrganizationAI';
 import Layout from './components/Layout';
+import GovernedReleaseWorkbench from './pages/GovernedReleaseWorkbench';
+import ClientGalleryPortal from './pages/ClientGalleryPortal';
 import './styles/App.css';
 
 // // === Batch 06 Gaps & Frontend Mounts ===
@@ -67,6 +69,8 @@ function App() {
     setUser(null);
   };
 
+  if (/^\/client-gallery\/?$/.test(window.location.pathname)) return <ClientGalleryPortal />;
+
   if (!token) {
     return (
       <>
@@ -86,6 +90,7 @@ function App() {
           <Route path="/" element={<Dashboard token={token} />} />
           <Route path="/clients" element={<Clients token={token} />} />
           <Route path="/galleries" element={<Galleries token={token} />} />
+          <Route path="/governed-releases" element={<GovernedReleaseWorkbench />} />
           <Route path="/contracts" element={<Contracts token={token} />} />
           <Route path="/invoices" element={<Invoices token={token} />} />
           <Route path="/shoots" element={<Shoots token={token} />} />

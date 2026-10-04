@@ -3,7 +3,7 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API = process.env.REACT_APP_API_URL || '';
 
 const emptyEquipment = { name: '', category: 'Camera', brand: '', model: '', serial_number: '', purchase_date: '', purchase_price: 0, condition: 'Excellent', notes: '', status: 'Available' };
 

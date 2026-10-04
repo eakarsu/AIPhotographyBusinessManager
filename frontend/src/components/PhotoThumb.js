@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API = process.env.REACT_APP_API_URL || '';
 
 // Loads real uploaded photo bytes from GET /api/photos/:id/data with auth and
 // revokes the object URL on unmount. No placeholder imagery is generated.

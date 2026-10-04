@@ -3,7 +3,7 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API = process.env.REACT_APP_API_URL || '';
 
 const emptyExpense = { title: '', category: 'Equipment', amount: 0, expense_date: '', vendor: '', description: '', is_tax_deductible: false, status: 'Recorded' };
 

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API = process.env.REACT_APP_API_URL || '';
 
 const positioningColor = (p) => {
   const m = { budget: '#9e9e9e', 'mid-range': '#2196f3', premium: '#9c27b0', luxury: '#f57f17' };

@@ -4,7 +4,7 @@ import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
 import AIOutput from '../components/AIOutput';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API = process.env.REACT_APP_API_URL || '';
 
 const emptyPost = { platform: 'Instagram', caption: '', hashtags: '', image_url: '', scheduled_date: '', status: 'Draft', engagement_likes: 0, engagement_comments: 0, engagement_shares: 0 };
 

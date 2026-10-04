@@ -3,7 +3,7 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import AIOutput from '../components/AIOutput';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API = process.env.REACT_APP_API_URL || '';
 
 export default function ShootPlanOptimize({ token }) {
   const headers = { Authorization: `Bearer ${token}` };

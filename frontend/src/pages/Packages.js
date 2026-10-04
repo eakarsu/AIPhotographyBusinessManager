@@ -3,7 +3,7 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import Modal from '../components/Modal';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API = process.env.REACT_APP_API_URL || '';
 
 const emptyPackage = { name: '', category: 'Portrait', description: '', price: 0, duration_hours: 1, deliverables: '', includes_album: false, includes_prints: false, max_photos: 0, status: 'Active' };
 
